@@ -59,6 +59,19 @@ public sealed class JsonlFileReadingSourceTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ReadAllAsync(source, cancellation.Token));
     }
 
+    [Fact]
+    public async Task GetFingerprintAsync_WhenContentIsUnchanged_ShouldReturnStableSha256Fingerprint()
+    {
+        await using var file = await TemporaryFile.CreateAsync("first" + Environment.NewLine + "second");
+        var source = new JsonlFileReadingSource(file.Path);
+
+        var first = await source.GetFingerprintAsync(CancellationToken.None);
+        var second = await source.GetFingerprintAsync(CancellationToken.None);
+
+        Assert.Equal(first, second);
+        Assert.Equal(64, first.Length);
+    }
+
     private static async Task<List<InputLine>> ReadAllAsync(IReadingSource source, CancellationToken cancellationToken = default)
     {
         var lines = new List<InputLine>();

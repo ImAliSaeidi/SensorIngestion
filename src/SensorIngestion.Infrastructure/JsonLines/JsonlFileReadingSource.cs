@@ -1,5 +1,6 @@
-﻿using SensorIngestion.Application.Ingestion;
+using SensorIngestion.Application.Ingestion;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 
 namespace SensorIngestion.Infrastructure.JsonLines;
 
@@ -27,10 +28,16 @@ public sealed class JsonlFileReadingSource : IReadingSource
 
         await using var stream = new FileStream(_path, options);
         using var reader = new StreamReader(stream);
-
         var lineNumber = 0L;
 
         while (await reader.ReadLineAsync(cancellationToken) is { } content)
             yield return new InputLine(++lineNumber, content);
+    }
+
+    public async ValueTask<string> GetFingerprintAsync(CancellationToken cancellationToken)
+    {
+        await using var stream = File.OpenRead(_path);
+        var hash = await SHA256.HashDataAsync(stream, cancellationToken);
+        return Convert.ToHexString(hash);
     }
 }

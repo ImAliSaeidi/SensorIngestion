@@ -53,6 +53,13 @@ await using (var scope = app.Services.CreateAsyncScope())
     var ruleDefinitions = await ruleLoader.LoadAsync(CancellationToken.None);
     var ruleCatalog = scope.ServiceProvider.GetRequiredService<SensorIngestion.Application.Persistence.IRuleCatalog>();
     await ruleCatalog.SynchronizeAsync(ruleDefinitions, DateTimeOffset.UtcNow, CancellationToken.None);
+
+    if (builder.Configuration.GetValue<bool>("Input:ProcessOnStartup"))
+    {
+        var processor = scope.ServiceProvider.GetRequiredService<SensorIngestion.Application.Ingestion.IngestionProcessor>();
+        var result = await processor.ProcessAsync(CancellationToken.None);
+        Console.WriteLine(result.Report);
+    }
 }
 
 // Configure the HTTP request pipeline.
