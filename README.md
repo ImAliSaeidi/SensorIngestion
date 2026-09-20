@@ -1,159 +1,195 @@
 # Sensor Ingestion
 
-This repository contains the implementation of the Sensor Ingestion, DanaTadbir technical task.
+This repository implements the DanaTadbir Backend Engineer technical task: ingesting messy sensor readings, evaluating configurable stateless and stateful rules, persisting auditable outcomes, generating cooldown-aware alerts, and exposing acceptable-reading aggregates.
 
 ## AI usage disclosure
 
-I used **OpenAI Codex**, a GPT-5-based AI coding agent, to help create and refine project documentation, including this README, and to discuss some architectural decisions and trade-offs. No other AI tools have been used so far.
+I used **OpenAI Codex**, a GPT-5-based AI coding agent, to draft and refine project documentation, discuss architectural decisions and trade-offs, and design and write parts of the automated test suite.
 
-Codex also designed and wrote parts of the automated test suite. I reviewed these tests and implemented the corresponding production code using a workflow close to test-driven development (TDD): the expected behavior was generally defined by tests first, and I then wrote the code required to satisfy them. I reviewed all AI-assisted work and remained responsible for the implementation and final technical decisions.
+I reviewed the AI-assisted documentation and tests and implemented the corresponding production code using a workflow close to test-driven development (TDD). I ran the complete test suite, verified the supplied dataset manually, and remain responsible for the final design and implementation decisions.
 
-## Domain model
+## Prerequisites
 
-The domain is kept independent of ASP.NET Core, EF Core, SQLite, file access, and JSON serialization. External input is converted into domain objects only after parsing and validation.
+- .NET 10 SDK
+- The supplied `readings.jsonl` file
+- A JSON rule file such as [`data/rules.json`](data/rules.json)
 
-Persisted entities use database-generated numeric IDs. A reading also exposes a `ReadingIdentity` value object made from `(deviceId, metric, timestamp, sequence)`. This is its natural identity for in-memory deduplication and is enforced separately as a unique database key.
+SQLite is embedded through EF Core, so no external database server is required.
 
-`Metric` is an extensible value object rather than an enum. The supplied metrics have convenient predefined values, while a new metric can still be introduced through input data and rule configuration without changing application code.
+## Build, test, and run
 
-A `SensorReading` starts with a `Pending` classification and becomes `Acceptable` or `Unacceptable` after every applicable enabled rule has been evaluated. Each applicable rule produces a separate `RuleEvaluation`, so a reading can retain all violations rather than only the first one.
+From the repository root:
 
-Rules are stored as immutable versions. `RuleKey` is the stable identifier from configuration, while the database ID identifies one exact version. Changing a rule creates a new version instead of overwriting the previous one, allowing every evaluation to refer back to the precise rule configuration that produced it. Operator-specific values are represented as named numeric parameters, keeping rule instances data-driven without introducing JSON concerns into the domain.
-
-Stateful evaluators produce an `AlertCandidate`. This is a general domain value rather than a model tied specifically to `SustainedAbove`. After the cooldown policy is applied, an accepted candidate becomes a persisted `Alert`. Both models carry the rule version, stream identity, start and end timestamps, optional peak value, and an explicit `IsOpen` flag.
-
-## Processing report
-
-`ProcessingReport` belongs to the Application layer because it summarizes one ingestion workflow rather than representing an independent domain entity. It is an immutable result containing the counters required by the task.
-
-The counters use the following meanings:
-
-- `TotalLinesRead`: every line read from the input file, including malformed and empty lines.
-- `ParsedReadings`: lines that were successfully parsed as JSON reading objects, including objects later rejected by semantic validation.
-- `StoredReadings`: valid, unique readings newly inserted during the current run.
-- `DuplicatesRemoved`: valid readings skipped because their natural reading identity had already been seen in the batch or already existed in storage.
-- `InvalidRecordsRejected`: syntactically malformed lines and parsed readings that failed semantic validation.
-- `RulesLoaded`: all valid rule definitions loaded from configuration, including disabled rules.
-- `RuleEvaluationsPerformed`: actual evaluations of enabled, applicable rules against readings.
-- `AcceptableReadings`: evaluated readings for which no applicable rule was violated.
-- `UnacceptableReadings`: evaluated readings for which at least one applicable rule was violated.
-- `RuleViolations`: individual violated rule results; this can exceed `UnacceptableReadings` when one reading violates multiple rules.
-- `AlertsGenerated`: new alerts that passed cooldown and were persisted during the current run. Suppressed candidates and alerts already present from an idempotent rerun are not counted.
-
-## Behavioral decisions
-
-### Duplicate readings
-
-A reading is identified by the following composite key:
-
-```text
-(deviceId, metric, ts, seq)
+```powershell
+dotnet build .\SensorIngestion.slnx --configuration Release
+dotnet test .\SensorIngestion.slnx --configuration Release
 ```
 
-When the same key appears more than once, the first valid occurrence wins. Later occurrences are treated as duplicates and do not reach rule evaluation, classification, aggregation, or alert generation.
+The Development configuration expects the supplied input at `D:\DanaTadbir\readings.jsonl`, processes it during startup, and copies `data/rules.json` beside the application output:
 
-The input contains a few duplicate keys whose values disagree. These still follow the first-wins rule, but they are logged as warnings because they indicate conflicting source data rather than a harmless repeated line. This policy is deterministic for the same input file and avoids silently replacing an already accepted reading.
-
-Database uniqueness will enforce the same identity so that processing the file again cannot insert a second copy.
-
-### Timestamp validation and event ordering
-
-Timestamps must be valid ISO-8601 UTC values ending in `Z`. Fractional seconds are accepted, but timestamps without the UTC designator or with a non-UTC offset are rejected. Valid timestamps are normalized to UTC before they are used as part of an identity, ordering decision, or query.
-
-The input file is a bounded batch and is known to be out of order. After invalid records and duplicates have been removed, readings are grouped by `(deviceId, metric)` and each group is ordered by:
-
-1. Event timestamp
-2. Sequence number
-
-Rule evaluation, sustained-duration measurement, episode boundaries, cooldowns, and aggregation all use event time rather than the original line order or processing time.
-
-Because the complete file is available before evaluation begins, there is no separate concept of a late arrival in the current implementation: every valid reading participates in the sort. A future streaming input would need an explicit lateness allowance and watermark policy; that is intentionally outside the scope of this batch-oriented task.
-
-### Readings with no applicable rules
-
-A valid reading is considered acceptable when no enabled rule applies to it. This includes cases where there is no rule for the reading's metric, or where all matching rules are disabled or scoped to another device.
-
-Invalid and duplicate records never reach this decision and are not counted as unacceptable readings.
-
-### `SustainedAbove` behavior
-
-A candidate episode starts when the first ordered reading is strictly greater than the configured threshold. The episode remains open while subsequent readings stay above the threshold and ends at the first reading whose value is less than or equal to it.
-
-The candidate becomes a confirmed violation when:
-
-```text
-current event time >= episode start + durationSeconds
+```powershell
+dotnet run --project .\src\SensorIngestion.Api\SensorIngestion.Api.csproj
 ```
 
-Short candidates that return to or below the threshold before reaching the required duration are discarded and do not produce alerts.
+Every path can be overridden without changing source code. Relative paths are resolved against `AppContext.BaseDirectory`:
 
-For a confirmed episode:
+```powershell
+dotnet run --project .\src\SensorIngestion.Api\SensorIngestion.Api.csproj -- `
+  --Input:Path="D:\path\to\readings.jsonl" `
+  --Input:ProcessOnStartup=true `
+  --RuleConfiguration:Path="D:\path\to\rules.json" `
+  --Persistence:DatabasePath="D:\path\to\sensor-ingestion.db"
+```
 
-- `startTs` is the timestamp of the first above-threshold reading, not the later confirmation timestamp.
-- `endTs` is the timestamp of the first reading at or below the threshold.
-- If the episode is still open at the end of the observed stream, `endTs` is the timestamp of the final observed reading in that stream.
-- Peak value is the highest value observed during the episode.
+With the default settings, the database is created at `src/SensorIngestion.Api/bin/<Configuration>/net10.0/data/sensor-ingestion.db`. The schema is created with `EnsureCreated` because this is a self-contained assessment project; a production service would use reviewed EF Core migrations.
 
-For per-reading classification, the current working policy is that readings become unacceptable from the reading that confirms the required duration onward. Earlier above-threshold readings in the same candidate episode remain acceptable unless another rule rejects them. This avoids retroactively changing previously classified readings and is compatible with a future incremental implementation.
+## Architecture
 
-> **Review before submission:** The brief clearly defines alert timestamps, but it is less explicit about which individual readings inside a sustained episode should be classified as unacceptable. Revisit this policy after the stateful evaluator and its tests are complete, and make sure the README, implementation, and test expectations all describe the same behavior.
+The dependency direction is `Api -> Infrastructure/Application -> Domain`:
 
-### Open sustained episodes
+- `SensorIngestion.Domain` contains readings, rules, rule evaluations, alert models, identities, and invariants. It has no ASP.NET Core, EF Core, file, or JSON dependency.
+- `SensorIngestion.Application` contains ingestion orchestration, preprocessing, rule strategies, stateful evaluation, cooldown, aggregation, and persistence/input ports.
+- `SensorIngestion.Infrastructure` implements JSONL input, JSON rule loading, SQLite persistence, and aggregate queries.
+- `SensorIngestion.Api` is the composition root and exposes the HTTP endpoint.
+- The two test projects separate fast domain/application tests from file, SQLite, startup, and HTTP integration tests.
 
-The task requires an alert for a confirmed episode even when the observed data ends before the metric returns to or below the threshold. Such an alert is persisted with the final observed event timestamp as `endTs`.
+SQLite was selected because the supplied input is a bounded assessment dataset and the task explicitly permits it. Storage access is behind application interfaces, so PostgreSQL or a time-series store can replace SQLite without moving persistence concerns into the domain. A time-series database would become attractive for high-volume retention and analytical queries, while alerts, rule versions, and audit records could remain in relational storage.
 
-This timestamp means "end of the available observation window," not proof that the real-world condition ended at that moment. If this were a live system, the alert would remain open and would be updated when a closing event arrived.
+`Metric` is an extensible value object rather than an enum. Rules use a stable `RuleKey`, while each persisted configuration has its own database-generated ID. If a rule's configuration hash changes, a new immutable version is inserted, allowing an evaluation to identify the exact rule version that produced it.
 
-The alert model includes an explicit `IsOpen` flag, so consumers do not have to infer this distinction from `endTs` alone.
+## Ingestion and messy-data policies
+
+Each JSONL line is handled independently. JSON shape/type validation happens in the infrastructure parser; domain construction then enforces semantic invariants. A rejected line is logged with its line number, category, and reason, but it never reaches evaluation or counts as unacceptable.
+
+Timestamps must be ISO-8601 UTC values ending in `Z`. Fractional seconds are accepted. Missing UTC markers, non-UTC offsets, invalid dates, negative sequences, missing identifiers, non-finite values, malformed JSON, and incorrect field types are rejected.
+
+A reading's natural identity is:
+
+```text
+(deviceId, metric, timestamp, sequence)
+```
+
+Duplicates use deterministic first-wins behavior. A later occurrence with a different value is still discarded, but it emits a structured warning. Database uniqueness enforces the same identity across reruns.
+
+The complete bounded input is collected, deduplicated, grouped by `(deviceId, metric)`, and sorted by event timestamp and then sequence. Evaluation, sustained duration, episode boundaries, cooldown, and aggregation therefore use event time rather than file order. In this batch model every valid row participates in the sort, so there is no late-arrival cutoff. A streaming version would need a watermark and explicit allowed-lateness policy.
+
+The current batch implementation uses `O(n)` working memory and approximately `O(n log n)` sorting time. It is intentionally simple for the supplied dataset. A larger or continuous workload should use chunked/bulk persistence, database-side upserts, incremental per-stream state, and watermark-based event-time processing instead of loading the complete batch and existing identity sets into memory.
+
+## Rule engine
+
+An enabled rule applies when its metric matches and its optional `deviceId` is either absent or matches the reading. A global rule therefore applies to every device carrying that metric. If no enabled rule applies, the reading is acceptable.
+
+An operator describes the condition a reading must satisfy. For example, `GreaterThan` passes only when the reading value is greater than its threshold; otherwise the rule is violated. Every applicable rule produces an auditable evaluation. A reading is acceptable only when all applicable rules pass, and one failed rule is enough to classify it as unacceptable.
+
+The stateless evaluation loop resolves operator strategies through `RuleOperatorRegistry`; it does not contain an operator switch. To add another stateless operator:
+
+1. Add its name and parameter names.
+2. Implement `IRuleOperatorStrategy`.
+3. Register the strategy in dependency injection.
+4. Extend the JSON adapter's validation and parameter mapping for the new input shape.
+
+The existing evaluation loop does not change. Adding or changing rule instances for supported operators only requires replacing `rules.json` and restarting the service. Missing files, malformed JSON, duplicate IDs, unknown operators, or missing/invalid parameters fail startup instead of silently disabling checks.
+
+### `SustainedAbove`
+
+Readings are scanned in event-time order per stream. A candidate episode starts at the first value strictly above the threshold and closes at the first value at or below it. It becomes confirmed when an observed reading reaches:
+
+```text
+reading timestamp >= episode start + durationSeconds
+```
+
+Readings before confirmation remain acceptable unless another rule rejects them. From the confirming reading onward, above-threshold readings are unacceptable. The closing reading passes the stateful rule. A candidate that closes before the duration is reached is discarded.
+
+For a confirmed episode, `startTs` is the first above-threshold event, `endTs` is the first event at or below the threshold, and `peakValue` is the highest observed value. If the input ends while a confirmed episode is active, it is persisted as open with `endTs` equal to the last observed event timestamp and `IsOpen = true`; this marks the end of observation, not proof that the real-world condition ended.
 
 ### Alert cooldown
 
-Cooldown is evaluated independently for each `(ruleId, deviceId, metric)` combination and uses event time. It is a domain-level deduplication policy: a sustained episode can create at most one alert, regardless of how many readings violate the rule.
-
-The working policy measures the quiet gap between the end of the last emitted alert and the start of the next confirmed episode. A new alert is emitted only after the configured cooldown has elapsed; otherwise the new candidate is suppressed.
-
-The default cooldown is five minutes, as requested by the brief. Suppression affects alert creation only; it does not erase the underlying reading classifications or rule-evaluation results.
-
-> **Review before submission:** Finalize the exact boundary behavior in tests: whether a gap of exactly five minutes is accepted or only a gap greater than five minutes. The brief uses wording that can support either interpretation. Also confirm whether a suppressed nearby episode should remain a separate recorded episode internally or be merged into the previous alert. The initial implementation should prefer suppression without merging unless the resulting model becomes confusing.
-
-### Aggregation behavior
-
-Aggregation operates only on acceptable readings. Invalid records, duplicates, and unacceptable readings do not contribute to count, average, minimum, or maximum values.
-
-The requested range uses half-open semantics:
+One confirmed episode produces one alert candidate. Cooldown is tracked independently per `(ruleId, deviceId, metric)` and defaults to five minutes. It measures the event-time gap from the previous emitted alert's end to the next episode's start:
 
 ```text
-[from, to)
+next start - previous emitted end >= 5 minutes
 ```
 
-A reading at `from` is included, while a reading exactly at `to` is excluded. Buckets are anchored at `from` and use the same half-open behavior. Empty buckets are omitted from the response rather than returned with zero counts.
+A gap of exactly five minutes is allowed. A candidate inside the cooldown is suppressed rather than merged, and a suppressed candidate does not move the cooldown reference point. Suppression affects alert creation only; reading classifications and rule evaluations remain available.
 
-Requests with missing identifiers, non-UTC timestamps, `from >= to`, or a non-positive bucket size are rejected as validation errors.
+## Persistence and idempotency
 
-### Rule configuration failures
+A processing run is recorded with its SHA-256 input fingerprint, status, timestamps, counters, and failure message when applicable. Reading, evaluation, and alert writes are committed atomically; a failed write rolls the processed data back while the run is marked failed.
 
-Rules are loaded from the configured JSON file when the application starts. Changing the file and restarting the service must be enough to add, enable, disable, or modify rule instances that use supported operators.
+Record-level idempotency is enforced with unique constraints:
 
-The application fails startup with a clear error when:
+- Reading: `(deviceId, metric, timestamp, sequence)`
+- Rule evaluation: `(sensorReadingId, ruleId)`
+- Alert: `(ruleId, deviceId, metric, startTimestamp)`
+- Rule version: `(ruleKey, configurationHash)`
 
-- The configured rule file cannot be found or read.
-- The JSON is malformed.
-- A rule ID is missing or duplicated.
-- Required operator parameters are missing or invalid.
-- An operator name is unknown.
+The fingerprint is retained for audit and repeat detection, while the natural keys remain the final protection. Reprocessing the supplied file creates a new run record but inserts no duplicate readings, evaluations, or alerts.
 
-Invalid rules are not silently ignored because that could make the service appear healthy while important checks are missing.
+## Aggregation API
 
-Adding a new rule that uses an existing operator is a data-only change. Adding a completely new operator requires a new strategy implementation and registration, but must not require changes to the existing evaluation loop.
+The endpoint is:
 
-### Idempotency keys
+```text
+GET /api/aggregations?deviceId=...&metric=...&from=...&to=...&bucketSeconds=...
+```
 
-Idempotency is enforced at the record level rather than relying only on a file-level "already processed" flag. The planned natural keys are:
+It includes only acceptable readings. The requested range and every bucket are half-open: `[from, to)`. Buckets are anchored at `from`; a reading exactly at `to` is excluded, and empty buckets are omitted. Missing identifiers, non-UTC timestamps, `from >= to`, or a non-positive bucket size return `400 Bad Request`.
 
-- Reading: `(deviceId, metric, ts, seq)`
-- Rule evaluation: `(readingId, ruleId)`
-- Alert: `(ruleId, deviceId, metric, startTs)`
+Example:
 
-An input-file hash may also be stored with the ingestion run for auditing and quick repeat detection, but database uniqueness remains the final protection against duplicates.
+```http
+GET /api/aggregations?deviceId=PUMP-01&metric=vibration&from=2025-06-01T08:20:00Z&to=2025-06-01T08:40:00Z&bucketSeconds=300
+```
 
-> **Review before submission:** Update this section with the exact table constraints and conflict-handling behavior once persistence is implemented. In particular, confirm how an open alert is updated without creating a new alert identity.
+```json
+[
+  { "start": "2025-06-01T08:20:00+00:00", "count": 30, "average": -1.0802333333333334, "minimum": -1.775, "maximum": -0.135 },
+  { "start": "2025-06-01T08:25:00+00:00", "count": 30, "average": 0.6027000000000001, "minimum": -0.021, "maximum": 1.113 },
+  { "start": "2025-06-01T08:30:00+00:00", "count": 30, "average": 0.5537666666666667, "minimum": -0.642, "maximum": 5.493 }
+]
+```
+
+## Processing report
+
+Counter meanings are:
+
+- `TotalLinesRead`: every physical input line.
+- `ParsedReadings`: JSON reading objects parsed far enough for field/semantic validation; these can still be rejected later. Malformed JSON and a non-object root are not counted here.
+- `StoredReadings`: valid unique readings newly inserted during this run.
+- `DuplicatesRemoved`: valid readings skipped because their natural identity was already seen in the batch.
+- `InvalidRecordsRejected`: malformed lines and parsed objects rejected by validation.
+- `RulesLoaded`: valid definitions loaded, including disabled rules.
+- `RuleEvaluationsPerformed`: enabled and applicable rule evaluations.
+- `AcceptableReadings` / `UnacceptableReadings`: classifications of valid unique readings.
+- `RuleViolations`: individual failed rule results, which can exceed the number of unacceptable readings.
+- `AlertsGenerated`: new alerts that pass cooldown and persistence idempotency.
+
+Verified first-run report for the supplied `readings.jsonl` and repository `rules.json`:
+
+```text
+Total lines read: 2150
+Parsed readings: 2149
+Stored readings: 2103
+Duplicates removed: 38
+Invalid records rejected: 9
+Rules loaded: 3
+Rule evaluations performed: 1050
+Acceptable readings: 1433
+Unacceptable readings: 670
+Rule violations: 670
+Alerts generated: 0
+```
+
+The supplied data does not contain a confirmed `SustainedAbove` episode for the configured `PUMP-01` temperature rule, so zero alerts is expected. On an immediate rerun against the same database, `Stored readings` becomes `0`; persisted reading, evaluation, and alert counts remain unchanged.
+
+## Verification
+
+The final Release verification completed with:
+
+- 210 passing unit tests
+- 45 passing integration tests
+- 0 failed or skipped tests
+- 0 compiler or analyzer warnings
+- 0 build errors
+
+Integration coverage includes messy out-of-order ingestion, cancellation and failure propagation, rule-file replacement, SQLite rollback and uniqueness, idempotent reruns, structured logs, acceptable-only half-open aggregation, and HTTP validation.
