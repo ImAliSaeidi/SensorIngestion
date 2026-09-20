@@ -50,7 +50,7 @@ public sealed class IngestionProcessor(
 
             var rejection = parseResult.Rejection!;
             rejections.Add(rejection);
-            logger.LogWarning("Reading rejected at line {LineNumber} with category {Category}: {Reason}", rejection.LineNumber, rejection.Category, rejection.Reason);
+            logger.LogWarning(IngestionLogEvents.RejectedRecord, "Reading rejected at line {LineNumber} with category {Category}: {Reason}", rejection.LineNumber, rejection.Category, rejection.Reason);
         }
 
         var deduplication = ReadingDeduplicator.Deduplicate(readings);
@@ -77,6 +77,7 @@ public sealed class IngestionProcessor(
         foreach (var episode in sustainedResult.Episodes)
         {
             logger.LogInformation(
+                IngestionLogEvents.SustainedEpisode,
                 "Sustained episode confirmed for rule {RuleKey}, device {DeviceId}, metric {Metric}, from {StartTimestamp} to {EndTimestamp}",
                 episode.Rule.RuleKey,
                 episode.DeviceId,
@@ -107,6 +108,7 @@ public sealed class IngestionProcessor(
         var persistenceResult = await persistence.PersistAsync(request, cancellationToken);
 
         logger.LogInformation(
+            IngestionLogEvents.IngestionCompleted,
             "Ingestion completed for fingerprint {FileFingerprint}: {TotalLinesRead} lines, {StoredReadings} stored readings, {InvalidRecordsRejected} invalid records, {AlertsGenerated} alerts",
             fingerprint,
             persistenceResult.Report.TotalLinesRead,
@@ -122,6 +124,7 @@ public sealed class IngestionProcessor(
         foreach (var duplicate in duplicates.Where(x => x.HasConflictingValue))
         {
             logger.LogWarning(
+                IngestionLogEvents.DuplicateConflict,
                 "Conflicting duplicate kept first value for {DeviceId} {Metric} at {Timestamp} sequence {Sequence}",
                 duplicate.KeptReading.DeviceId,
                 duplicate.KeptReading.Metric.Value,
@@ -133,10 +136,10 @@ public sealed class IngestionProcessor(
     private void LogAlertEvents(AlertGenerationResult generated)
     {
         foreach (var alert in generated.Alerts)
-            logger.LogInformation("Alert emitted for rule {RuleId}, device {DeviceId}, metric {Metric}, starting {StartTimestamp}", alert.RuleId, alert.DeviceId, alert.Metric.Value, alert.StartTimestamp);
+            logger.LogInformation(IngestionLogEvents.AlertEmitted, "Alert emitted for rule {RuleId}, device {DeviceId}, metric {Metric}, starting {StartTimestamp}", alert.RuleId, alert.DeviceId, alert.Metric.Value, alert.StartTimestamp);
 
         foreach (var candidate in generated.SuppressedCandidates)
-            logger.LogInformation("Alert suppressed by cooldown for rule {RuleId}, device {DeviceId}, metric {Metric}, starting {StartTimestamp}", candidate.RuleId, candidate.DeviceId, candidate.Metric.Value, candidate.StartTimestamp);
+            logger.LogInformation(IngestionLogEvents.AlertSuppressed, "Alert suppressed by cooldown for rule {RuleId}, device {DeviceId}, metric {Metric}, starting {StartTimestamp}", candidate.RuleId, candidate.DeviceId, candidate.Metric.Value, candidate.StartTimestamp);
     }
 
     private static void AddDraft(SensorReading reading, RuleEvaluationDecision decision, IReadOnlyCollection<Rule> rules, ICollection<RuleEvaluationDraft> drafts, ref int violationCount)

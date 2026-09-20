@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using SensorIngestion.Application.Alerting;
 using SensorIngestion.Application.Ingestion;
 using SensorIngestion.Application.Persistence;
@@ -74,7 +75,24 @@ public sealed class IngestionProcessorTests
         Assert.Equal("Persistence failed.", exception.Message);
     }
 
-    private static IngestionProcessor CreateProcessor(SensorIngestionDbContext context, IReadingSource source, IRuleConfigurationLoader ruleLoader, IIngestionPersistence? persistence = null)
+    [Fact]
+    public async Task ProcessAsync_ShouldWriteFocusedStructuredOperationalLogs()
+    {
+        await using var fixture = await SqliteFixture.CreateAsync();
+        var logger = new RecordingLogger<IngestionProcessor>();
+        var processor = CreateProcessor(fixture.Context, new TestReadingSource(CreateLines()), new TestRuleLoader(CreateDefinitions()), logger: logger);
+
+        await processor.ProcessAsync(CancellationToken.None);
+
+        Assert.Contains(logger.Entries, x => x.EventId == IngestionLogEvents.RejectedRecord.Id && x.HasProperty("LineNumber"));
+        Assert.Contains(logger.Entries, x => x.EventId == IngestionLogEvents.DuplicateConflict.Id && x.HasProperty("DeviceId") && x.HasProperty("Sequence"));
+        Assert.Equal(2, logger.Entries.Count(x => x.EventId == IngestionLogEvents.SustainedEpisode.Id));
+        Assert.Contains(logger.Entries, x => x.EventId == IngestionLogEvents.AlertEmitted.Id && x.HasProperty("RuleId"));
+        Assert.Contains(logger.Entries, x => x.EventId == IngestionLogEvents.AlertSuppressed.Id && x.HasProperty("StartTimestamp"));
+        Assert.Contains(logger.Entries, x => x.EventId == IngestionLogEvents.IngestionCompleted.Id && x.HasProperty("FileFingerprint") && x.HasProperty("StoredReadings"));
+    }
+
+    private static IngestionProcessor CreateProcessor(SensorIngestionDbContext context, IReadingSource source, IRuleConfigurationLoader ruleLoader, IIngestionPersistence? persistence = null, ILogger<IngestionProcessor>? logger = null)
     {
         var registry = new RuleOperatorRegistry([new GreaterThanOperatorStrategy()]);
         return new IngestionProcessor(
@@ -87,7 +105,7 @@ public sealed class IngestionProcessorTests
             new AlertGenerator(),
             persistence ?? new EfIngestionPersistence(context),
             new FixedTimeProvider(Start.AddHours(2)),
-            NullLogger<IngestionProcessor>.Instance);
+            logger ?? NullLogger<IngestionProcessor>.Instance);
     }
 
     private static IReadOnlyList<InputLine> CreateLines()
@@ -96,7 +114,7 @@ public sealed class IngestionProcessorTests
             Line(1, "temperature", "2025-06-01T08:00:30Z", 85, 3),
             new InputLine(2, "not-json"),
             Line(3, "temperature", "2025-06-01T08:00:00Z", 81, 1),
-            Line(4, "temperature", "2025-06-01T08:00:00Z", 81, 1),
+            Line(4, "temperature", "2025-06-01T08:00:00Z", 99, 1),
             Line(5, "temperature", "2025-06-01T08:00:40Z", 80, 4),
             Line(6, "temperature", "2025-06-01T08:00:10Z", 82, 2),
             Line(7, "temperature", "2025-06-01T08:01:00Z", 81, 5),
@@ -168,6 +186,36 @@ public sealed class IngestionProcessorTests
     {
         public Task<IngestionPersistenceResult> PersistAsync(IngestionPersistenceRequest request, CancellationToken cancellationToken)
             => throw new InvalidOperationException("Persistence failed.");
+    }
+
+    private sealed class RecordingLogger<T> : ILogger<T>
+    {
+        public List<LogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.ToDictionary(x => x.Key, x => x.Value)
+                : new Dictionary<string, object?>();
+
+            Entries.Add(new LogEntry(logLevel, eventId.Id, properties));
+        }
+    }
+
+    private sealed record LogEntry(LogLevel Level, int EventId, IReadOnlyDictionary<string, object?> Properties)
+    {
+        public bool HasProperty(string name) => Properties.ContainsKey(name);
+    }
+
+    private sealed class NullScope : IDisposable
+    {
+        public static NullScope Instance { get; } = new();
+
+        public void Dispose() { }
     }
 
     private sealed class SqliteFixture : IAsyncDisposable
