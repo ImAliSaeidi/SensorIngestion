@@ -1,4 +1,5 @@
-﻿using SensorIngestion.Infrastructure.RuleConfiguration.Models;
+﻿using SensorIngestion.Application.Rules;
+using SensorIngestion.Infrastructure.RuleConfiguration.Models;
 
 namespace SensorIngestion.Infrastructure.RuleConfiguration;
 
@@ -6,11 +7,11 @@ internal static class RuleConfigurationValidator
 {
     private static readonly HashSet<string> ComparisonOperators =
     [
-        "GreaterThan",
-        "GreaterThanOrEqual",
-        "LessThan",
-        "LessThanOrEqual",
-        "Equal"
+        RuleOperatorNames.GreaterThan,
+        RuleOperatorNames.GreaterThanOrEqual,
+        RuleOperatorNames.LessThan,
+        RuleOperatorNames.LessThanOrEqual,
+        RuleOperatorNames.Equal
     ];
 
     public static void Validate(IReadOnlyCollection<RuleJsonDto> rules)
@@ -61,14 +62,14 @@ internal static class RuleConfigurationValidator
     {
         if (ComparisonOperators.Contains(rule.Operator!))
         {
-            RequireFinite(rule.Threshold, rule.Id!, "threshold");
+            RequireFinite(rule.Threshold, rule.Id!, RuleParameterNames.Threshold);
             return;
         }
 
-        if (rule.Operator == "Between")
+        if (rule.Operator == RuleOperatorNames.Between)
         {
-            RequireFinite(rule.LowerBound, rule.Id!, "lowerBound");
-            RequireFinite(rule.UpperBound, rule.Id!, "upperBound");
+            RequireFinite(rule.LowerBound, rule.Id!, RuleParameterNames.LowerBound);
+            RequireFinite(rule.UpperBound, rule.Id!, RuleParameterNames.UpperBound);
 
             if (rule.LowerBound >= rule.UpperBound)
                 throw new InvalidDataException($"Rule '{rule.Id}' requires lowerBound < upperBound.");
@@ -76,10 +77,10 @@ internal static class RuleConfigurationValidator
             return;
         }
 
-        if (rule.Operator == "SustainedAbove")
+        if (rule.Operator == RuleOperatorNames.SustainedAbove)
         {
-            RequireFinite(rule.Threshold, rule.Id!, "threshold");
-            RequireFinite(rule.DurationSeconds, rule.Id!, "durationSeconds");
+            RequireFinite(rule.Threshold, rule.Id!, RuleParameterNames.Threshold);
+            RequireFinite(rule.DurationSeconds, rule.Id!, RuleParameterNames.DurationSeconds);
 
             if (rule.DurationSeconds <= 0)
                 throw new InvalidDataException($"Rule '{rule.Id}' requires a positive durationSeconds.");

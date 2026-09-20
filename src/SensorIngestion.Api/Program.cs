@@ -1,4 +1,7 @@
 using SensorIngestion.Application.Rules.Configuration;
+using SensorIngestion.Application.Rules.Evaluation;
+using SensorIngestion.Application.Rules.Evaluation.Operators;
+using SensorIngestion.Application.Rules.Evaluation.Stateful;
 using SensorIngestion.Infrastructure.RuleConfiguration;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +26,16 @@ builder.Services.AddSingleton<IRuleConfigurationLoader>(provider =>
 
     return new JsonRuleConfigurationLoader(resolvedPath);
 });
+
+builder.Services.AddSingleton<IRuleOperatorStrategy, BetweenOperatorStrategy>();
+builder.Services.AddSingleton<IRuleOperatorStrategy, EqualOperatorStrategy>();
+builder.Services.AddSingleton<IRuleOperatorStrategy, GreaterThanOperatorStrategy>();
+builder.Services.AddSingleton<IRuleOperatorStrategy, GreaterThanOrEqualOperatorStrategy>();
+builder.Services.AddSingleton<IRuleOperatorStrategy, LessThanOperatorStrategy>();
+builder.Services.AddSingleton<IRuleOperatorStrategy, LessThanOrEqualOperatorStrategy>();
+builder.Services.AddSingleton<RuleOperatorRegistry>();
+builder.Services.AddSingleton<StatelessRuleEvaluator>();
+builder.Services.AddSingleton<SustainedAboveEvaluator>();
 
 var app = builder.Build();
 

@@ -52,7 +52,7 @@ public class JsonRuleConfigurationLoader : IRuleConfigurationLoader
         var metric = Metric.Create(dto.Metric!);
         var deviceId = string.IsNullOrWhiteSpace(dto.DeviceId) ? null : dto.DeviceId.Trim();
         var @operator = RuleOperator.Create(dto.Operator!);
-        var parameters = CreateParameters(dto);
+        var parameters = RuleParameterMapper.Map(dto);
 
         var hash = RuleConfigurationHasher.Compute(
             ruleKey,
@@ -72,31 +72,5 @@ public class JsonRuleConfigurationLoader : IRuleConfigurationLoader
             @operator,
             parameters,
             hash);
-    }
-
-    private static IReadOnlyCollection<RuleParameter> CreateParameters(RuleJsonDto dto)
-    {
-        if (dto.Operator is "GreaterThan" or "GreaterThanOrEqual" or "LessThan" or "LessThanOrEqual" or "Equal")
-            return [RuleParameter.Create("threshold", dto.Threshold!.Value)];
-
-        if (dto.Operator == "Between")
-        {
-            return
-            [
-                RuleParameter.Create("lowerBound", dto.LowerBound!.Value),
-            RuleParameter.Create("upperBound", dto.UpperBound!.Value)
-            ];
-        }
-
-        if (dto.Operator == "SustainedAbove")
-        {
-            return
-            [
-                RuleParameter.Create("threshold", dto.Threshold!.Value),
-            RuleParameter.Create("durationSeconds", dto.DurationSeconds!.Value)
-            ];
-        }
-
-        throw new InvalidDataException($"Unknown operator '{dto.Operator}'.");
     }
 }
