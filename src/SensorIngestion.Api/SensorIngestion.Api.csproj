@@ -22,4 +22,8 @@
     <ProjectReference Include="..\SensorIngestion.Infrastructure\SensorIngestion.Infrastructure.csproj" />
   </ItemGroup>
 
+<ItemGroup>
+  <Content Include="..\..\data\rules.json" Link="data\rules.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+</ItemGroup>
+
 </Project>
