@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SensorIngestion.Application.Ingestion;
+using SensorIngestion.Application.Aggregation;
 using SensorIngestion.Application.Persistence;
 using SensorIngestion.Infrastructure.JsonLines;
 using SensorIngestion.Infrastructure.Persistence;
@@ -20,6 +21,8 @@ public static class DependencyInjection
         services.AddDbContext<SensorIngestionDbContext>(options => options.UseSqlite($"Data Source={resolvedPath}"));
         services.AddScoped<IRuleCatalog, EfRuleCatalog>();
         services.AddScoped<IIngestionPersistence, EfIngestionPersistence>();
+        services.AddScoped<IReadingAggregationStore, EfReadingAggregationStore>();
+        services.AddScoped<GetReadingAggregates>();
         services.AddSingleton<IReadingParser, JsonlReadingParser>();
         services.AddSingleton<IReadingSource>(_ => new JsonlFileReadingSource(ResolveInputPath(configuration)));
         services.AddSingleton(TimeProvider.System);
