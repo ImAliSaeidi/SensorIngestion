@@ -39,7 +39,25 @@ public sealed class AggregationsEndpointTests
             bucket => Assert.Equal((From.AddMinutes(1), 1, 30d, 30d, 30d), (bucket.Start, bucket.Count, bucket.Average, bucket.Minimum, bucket.Maximum)));
     }
 
+    [Fact]
+    public async Task Get_WhenNoAcceptableReadingMatches_ShouldReturnEmptyArray()
+    {
+        await using var fixture = await ApiFixture.CreateAsync();
+        await fixture.SeedAsync(Reading(From.AddSeconds(30), 10, acceptable: false, sequence: 1));
+
+        var response = await fixture.Client.GetAsync("api/aggregations?deviceId=PUMP-01&metric=temperature&from=2025-06-01T08:00:00Z&to=2025-06-01T08:02:00Z&bucketSeconds=60");
+        var buckets = await response.Content.ReadFromJsonAsync<AggregationBucketResponse[]>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty(buckets!);
+    }
+
     [Theory]
+    [InlineData("api/aggregations?metric=temperature&from=2025-06-01T08:00:00Z&to=2025-06-01T08:02:00Z&bucketSeconds=60")]
+    [InlineData("api/aggregations?deviceId=PUMP-01&from=2025-06-01T08:00:00Z&to=2025-06-01T08:02:00Z&bucketSeconds=60")]
+    [InlineData("api/aggregations?deviceId=PUMP-01&metric=temperature&to=2025-06-01T08:02:00Z&bucketSeconds=60")]
+    [InlineData("api/aggregations?deviceId=PUMP-01&metric=temperature&from=2025-06-01T08:00:00Z&bucketSeconds=60")]
+    [InlineData("api/aggregations?deviceId=PUMP-01&metric=temperature&from=2025-06-01T08:00:00Z&to=2025-06-01T08:02:00Z")]
     [InlineData("api/aggregations?deviceId=PUMP-01&metric=temperature&from=2025-06-01T08:00:00Z&to=2025-06-01T08:02:00Z&bucketSeconds=0")]
     [InlineData("api/aggregations?deviceId=PUMP-01&metric=temperature&from=2025-06-01T08:02:00Z&to=2025-06-01T08:00:00Z&bucketSeconds=60")]
     [InlineData("api/aggregations?deviceId=PUMP-01&metric=temperature&from=2025-06-01T11:30:00%2B03:30&to=2025-06-01T11:32:00%2B03:30&bucketSeconds=60")]
