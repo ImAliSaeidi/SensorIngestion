@@ -8,6 +8,40 @@ The AI tool used in this project is **OpenAI Codex**, a GPT-5-based AI coding ag
 
 Codex has not been used to generate, edit, or apply changes to the application or test source code. All implementation work and final technical decisions are reviewed and carried out by the candidate.
 
+## Domain model
+
+The domain is kept independent of ASP.NET Core, EF Core, SQLite, file access, and JSON serialization. External input is converted into domain objects only after parsing and validation.
+
+Persisted entities use database-generated numeric IDs. A reading also exposes a `ReadingIdentity` value object made from `(deviceId, metric, timestamp, sequence)`. This is its natural identity for in-memory deduplication and is enforced separately as a unique database key.
+
+`Metric` is an extensible value object rather than an enum. The supplied metrics have convenient predefined values, while a new metric can still be introduced through input data and rule configuration without changing application code.
+
+A `SensorReading` starts with a `Pending` classification and becomes `Acceptable` or `Unacceptable` after every applicable enabled rule has been evaluated. Each applicable rule produces a separate `RuleEvaluation`, so a reading can retain all violations rather than only the first one.
+
+Rules are stored as immutable versions. `RuleKey` is the stable identifier from configuration, while the database ID identifies one exact version. Changing a rule creates a new version instead of overwriting the previous one, allowing every evaluation to refer back to the precise rule configuration that produced it. Operator-specific values are represented as named numeric parameters, keeping rule instances data-driven without introducing JSON concerns into the domain.
+
+Stateful evaluators produce an `AlertCandidate`. This is a general domain value rather than a model tied specifically to `SustainedAbove`. After the cooldown policy is applied, an accepted candidate becomes a persisted `Alert`. Both models carry the rule version, stream identity, start and end timestamps, optional peak value, and an explicit `IsOpen` flag.
+
+## Processing report
+
+`ProcessingReport` belongs to the Application layer because it summarizes one ingestion workflow rather than representing an independent domain entity. It is an immutable result containing the counters required by the task.
+
+The counters use the following meanings:
+
+- `TotalLinesRead`: every line read from the input file, including malformed and empty lines.
+- `ParsedReadings`: lines that were successfully parsed as JSON reading objects, including objects later rejected by semantic validation.
+- `StoredReadings`: valid, unique readings newly inserted during the current run.
+- `DuplicatesRemoved`: valid readings skipped because their natural reading identity had already been seen in the batch or already existed in storage.
+- `InvalidRecordsRejected`: syntactically malformed lines and parsed readings that failed semantic validation.
+- `RulesLoaded`: all valid rule definitions loaded from configuration, including disabled rules.
+- `RuleEvaluationsPerformed`: actual evaluations of enabled, applicable rules against readings.
+- `AcceptableReadings`: evaluated readings for which no applicable rule was violated.
+- `UnacceptableReadings`: evaluated readings for which at least one applicable rule was violated.
+- `RuleViolations`: individual violated rule results; this can exceed `UnacceptableReadings` when one reading violates multiple rules.
+- `AlertsGenerated`: new alerts that passed cooldown and were persisted during the current run. Suppressed candidates and alerts already present from an idempotent rerun are not counted.
+
+## Behavioral decisions
+
 ### Duplicate readings
 
 A reading is identified by the following composite key:
@@ -70,7 +104,7 @@ The task requires an alert for a confirmed episode even when the observed data e
 
 This timestamp means "end of the available observation window," not proof that the real-world condition ended at that moment. If this were a live system, the alert would remain open and would be updated when a closing event arrived.
 
-> **Review before submission:** Confirm that the persistence model makes this distinction understandable. If necessary, add an `IsOpen` field rather than relying only on the meaning of `endTs`.
+The alert model includes an explicit `IsOpen` flag, so consumers do not have to infer this distinction from `endTs` alone.
 
 ### Alert cooldown
 

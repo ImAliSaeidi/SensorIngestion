@@ -9,7 +9,10 @@
   <ItemGroup>
     <Folder Include="JsonLines\" />
     <Folder Include="RuleConfiguration\" />
-    <Folder Include="Persistence\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>

@@ -8,7 +8,6 @@
 
   <ItemGroup>
     <Folder Include="Abstractions\" />
-    <Folder Include="Ingestion\" />
     <Folder Include="Alerting\" />
     <Folder Include="Aggregation\" />
     <Folder Include="Reporting\" />
