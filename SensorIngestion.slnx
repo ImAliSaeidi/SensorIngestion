@@ -1,1 +1,10 @@
-<Solution />
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/SensorIngestion.IntegrationTests/SensorIngestion.IntegrationTests.csproj" />
+    <Project Path="tests/SensorIngestion.UnitTests/SensorIngestion.UnitTests.csproj" />
+  </Folder>
+  <Project Path="src/SensorIngestion.Api/SensorIngestion.Api.csproj" />
+  <Project Path="src/SensorIngestion.Application/SensorIngestion.Application.csproj" />
+  <Project Path="src/SensorIngestion.Domain/SensorIngestion.Domain.csproj" />
+  <Project Path="src/SensorIngestion.Infrastructure/SensorIngestion.Infrastructure.csproj" />
+</Solution>
