@@ -21,6 +21,8 @@ public class Alert : Entity
 
     public DateTimeOffset CreatedAt { get; private set; }
 
+    public AlertIdentity Identity => new(RuleId, DeviceId, Metric, StartTimestamp);
+
     private Alert() { }
 
     private Alert(AlertCandidate candidate, DateTimeOffset createdAt)

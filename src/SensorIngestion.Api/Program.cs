@@ -1,3 +1,4 @@
+using SensorIngestion.Application.Alerting;
 using SensorIngestion.Application.Rules.Configuration;
 using SensorIngestion.Application.Rules.Evaluation;
 using SensorIngestion.Application.Rules.Evaluation.Operators;
@@ -36,6 +37,7 @@ builder.Services.AddSingleton<IRuleOperatorStrategy, LessThanOrEqualOperatorStra
 builder.Services.AddSingleton<RuleOperatorRegistry>();
 builder.Services.AddSingleton<StatelessRuleEvaluator>();
 builder.Services.AddSingleton<SustainedAboveEvaluator>();
+builder.Services.AddSingleton<AlertGenerator>();
 
 var app = builder.Build();
 

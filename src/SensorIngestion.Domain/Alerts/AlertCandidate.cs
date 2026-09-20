@@ -18,6 +18,8 @@ public sealed record AlertCandidate
 
     public bool IsOpen { get; }
 
+    public AlertIdentity Identity => new(RuleId, DeviceId, Metric, StartTimestamp);
+
     public AlertCandidate(long ruleId, string deviceId, Metric metric, DateTimeOffset startTimestamp, DateTimeOffset endTimestamp, double? peakValue, bool isOpen)
     {
         if (ruleId <= 0)
