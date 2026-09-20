@@ -4,9 +4,9 @@ This repository contains the implementation of the Sensor Ingestion, DanaTadbir 
 
 ## AI usage disclosure
 
-The AI tool used in this project is **OpenAI Codex**, a GPT-5-based AI coding agent. Codex was used to help prepare and refine project documentation, including this README, and as a discussion partner when considering some architectural decisions and trade-offs. No other AI tools have been used so far.
+I used **OpenAI Codex**, a GPT-5-based AI coding agent, to help create and refine project documentation, including this README, and to discuss some architectural decisions and trade-offs. No other AI tools have been used so far.
 
-Codex has not been used to generate, edit, or apply changes to the application or test source code. All implementation work and final technical decisions are reviewed and carried out by the candidate.
+Codex also designed and wrote parts of the automated test suite. I reviewed these tests and implemented the corresponding production code using a workflow close to test-driven development (TDD): the expected behavior was generally defined by tests first, and I then wrote the code required to satisfy them. I reviewed all AI-assisted work and remained responsible for the implementation and final technical decisions.
 
 ## Domain model
 
@@ -58,7 +58,7 @@ Database uniqueness will enforce the same identity so that processing the file a
 
 ### Timestamp validation and event ordering
 
-Timestamps must be valid ISO-8601 values with an explicit timezone offset. They are normalized to UTC before they are used as part of an identity, ordering decision, or query.
+Timestamps must be valid ISO-8601 UTC values ending in `Z`. Fractional seconds are accepted, but timestamps without the UTC designator or with a non-UTC offset are rejected. Valid timestamps are normalized to UTC before they are used as part of an identity, ordering decision, or query.
 
 The input file is a bounded batch and is known to be out of order. After invalid records and duplicates have been removed, readings are grouped by `(deviceId, metric)` and each group is ordered by:
 

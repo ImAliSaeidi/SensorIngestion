@@ -18,4 +18,9 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SensorIngestion.Application\SensorIngestion.Application.csproj" />
+    <ProjectReference Include="..\..\src\SensorIngestion.Infrastructure\SensorIngestion.Infrastructure.csproj" />
+  </ItemGroup>
+
 </Project>

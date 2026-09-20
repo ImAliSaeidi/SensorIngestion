@@ -30,6 +30,8 @@ public sealed class SensorReading : Entity
         if (!double.IsFinite(value))
             throw new ArgumentException("sensor value must be finite", nameof(value));
 
+        ArgumentOutOfRangeException.ThrowIfNegative(sequence);
+
         DeviceId = deviceId.Trim();
         Metric = metric ?? throw new ArgumentNullException(nameof(metric), "metric cannot be null");
         Timestamp = timestamp.ToUniversalTime();

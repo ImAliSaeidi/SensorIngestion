@@ -8,7 +8,7 @@ public sealed record RuleParameter
 
     private RuleParameter(string name, double value)
     {
-        Name = name;
+        Name = name.Trim();
         Value = value;
     }
 

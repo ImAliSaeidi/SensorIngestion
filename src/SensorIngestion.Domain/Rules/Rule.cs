@@ -22,7 +22,7 @@ public sealed class Rule : Entity
 
     public RuleOperator Operator { get; private set; } = null!;
 
-    public IReadOnlyCollection<RuleParameter> Parameters => _parameters;
+    public IReadOnlyCollection<RuleParameter> Parameters => _parameters.AsReadOnly();
 
     public string ConfigurationHash { get; private set; } = null!;
 

@@ -7,7 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="JsonLines\" />
     <Folder Include="RuleConfiguration\" />
   </ItemGroup>
 
