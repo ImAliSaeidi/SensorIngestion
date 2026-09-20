@@ -29,6 +29,9 @@ internal class SensorReadingConfiguration : IEntityTypeConfiguration<SensorReadi
             .HasConversion<string>()
             .HasMaxLength(32);
 
+        builder.Property(x => x.Timestamp)
+            .HasConversion(x => x.UtcTicks, x => new DateTimeOffset(x, TimeSpan.Zero));
+
         builder.Ignore(x => x.Identity);
 
         builder.HasIndex(x => new
@@ -38,5 +41,13 @@ internal class SensorReadingConfiguration : IEntityTypeConfiguration<SensorReadi
             x.Timestamp,
             x.Sequence
         }).IsUnique();
+
+        builder.HasIndex(x => new
+        {
+            x.DeviceId,
+            x.Metric,
+            x.Classification,
+            x.Timestamp
+        });
     }
 }

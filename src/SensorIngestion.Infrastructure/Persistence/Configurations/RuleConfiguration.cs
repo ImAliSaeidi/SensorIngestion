@@ -47,10 +47,19 @@ internal class RuleConfiguration : IEntityTypeConfiguration<Rule>
             .HasMaxLength(64)
             .IsRequired();
 
+        builder.Property(x => x.CreatedAt)
+            .HasConversion(x => x.UtcTicks, x => new DateTimeOffset(x, TimeSpan.Zero));
+
         builder.HasIndex(x => new
         {
             x.RuleKey,
             x.Version
+        }).IsUnique();
+
+        builder.HasIndex(x => new
+        {
+            x.RuleKey,
+            x.ConfigurationHash
         }).IsUnique();
 
         builder.OwnsMany(x => x.Parameters, parameter =>
@@ -91,6 +100,17 @@ public class AlertConfiguration : IEntityTypeConfiguration<Alert>
                 value => Metric.Create(value))
             .HasMaxLength(64)
             .IsRequired();
+
+        builder.Property(x => x.StartTimestamp)
+            .HasConversion(x => x.UtcTicks, x => new DateTimeOffset(x, TimeSpan.Zero));
+
+        builder.Property(x => x.EndTimestamp)
+            .HasConversion(x => x.UtcTicks, x => new DateTimeOffset(x, TimeSpan.Zero));
+
+        builder.Property(x => x.CreatedAt)
+            .HasConversion(x => x.UtcTicks, x => new DateTimeOffset(x, TimeSpan.Zero));
+
+        builder.Ignore(x => x.Identity);
 
         builder.HasOne<Rule>()
             .WithMany()

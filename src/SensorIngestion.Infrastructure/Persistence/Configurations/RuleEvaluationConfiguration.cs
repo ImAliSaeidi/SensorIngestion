@@ -23,6 +23,9 @@ public class RuleEvaluationConfiguration : IEntityTypeConfiguration<RuleEvaluati
         builder.Property(x => x.Reason)
             .HasMaxLength(512);
 
+        builder.Property(x => x.EvaluatedAt)
+            .HasConversion(x => x.UtcTicks, x => new DateTimeOffset(x, TimeSpan.Zero));
+
         builder.HasOne<SensorReading>()
             .WithMany()
             .HasForeignKey(x => x.SensorReadingId)
