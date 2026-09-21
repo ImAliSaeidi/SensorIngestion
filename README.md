@@ -131,6 +131,8 @@ To add another stateful operator, implement `IStatefulRuleEvaluator` and registe
 
 The existing evaluation loop does not change. Adding or changing rule instances for supported operators only requires replacing `rules.json` and restarting the service. Missing files, malformed JSON, duplicate IDs, unknown operators, or missing/invalid parameters fail startup instead of silently disabling checks.
 
+The default `rules.json` contains enabled examples of all supported operators. The rules target different device/metric streams so the supplied dataset exercises passing readings, violations, a global pressure rule, a confirmed sustained episode, alert emission, and cooldown suppression in one run.
+
 ### `SustainedAbove`
 
 Readings are scanned in event-time order per stream. A candidate episode starts at the first value strictly above the threshold and closes at the first value at or below it. It becomes confirmed when an observed reading reaches:
@@ -231,9 +233,7 @@ GET /api/aggregations?deviceId=PUMP-01&metric=vibration&from=2025-06-01T08:20:00
 
 ```json
 [
-  { "start": "2025-06-01T08:20:00+00:00", "count": 30, "average": -1.0802333333333334, "minimum": -1.775, "maximum": -0.135 },
-  { "start": "2025-06-01T08:25:00+00:00", "count": 30, "average": 0.6027000000000001, "minimum": -0.021, "maximum": 1.113 },
-  { "start": "2025-06-01T08:30:00+00:00", "count": 30, "average": 0.5537666666666667, "minimum": -0.642, "maximum": 5.493 }
+  { "start": "2025-06-01T08:20:00+00:00", "count": 29, "average": 2.826241379310345, "minimum": 1.878, "maximum": 3.991 }
 ]
 ```
 
@@ -256,19 +256,19 @@ Verified first-run report for the supplied `src/SensorIngestion.Api/data/reading
 
 ```text
 Total lines read: 2150
-Parsed readings: 2149
+Parsed readings: 2148
 Stored readings: 2103
 Duplicates removed: 38
 Invalid records rejected: 9
-Rules loaded: 3
-Rule evaluations performed: 1050
-Acceptable readings: 1433
-Unacceptable readings: 670
-Rule violations: 670
-Alerts generated: 0
+Rules loaded: 7
+Rule evaluations performed: 1891
+Acceptable readings: 1475
+Unacceptable readings: 628
+Rule violations: 628
+Alerts generated: 1
 ```
 
-The supplied data does not contain a confirmed `SustainedAbove` episode for the configured `PUMP-01` temperature rule, so zero alerts is expected. On an immediate rerun against the same database, `Stored readings` becomes `0`; persisted reading, evaluation, and alert counts remain unchanged.
+The configured `PUMP-01` sustained-temperature rule confirms two episodes. The first emits an alert; the second starts within five minutes of the previous emitted episode's end and is suppressed by cooldown. On an immediate rerun against the same database, `Stored readings` and `Alerts generated` become `0`; persisted reading, evaluation, and alert counts remain unchanged.
 
 ## Verification
 

@@ -1,29 +1,65 @@
 [
   {
     "id": "temperature-limit",
-    "name": "Temperature Limit",
+    "name": "Pump 01 Temperature Above 68",
     "deviceId": "PUMP-01",
     "metric": "temperature",
     "operator": "GreaterThan",
-    "threshold": 80,
+    "threshold": 68,
+    "enabled": true
+  },
+  {
+    "id": "pump-02-temperature-minimum",
+    "name": "Pump 02 Temperature At Least 71",
+    "deviceId": "PUMP-02",
+    "metric": "temperature",
+    "operator": "GreaterThanOrEqual",
+    "threshold": 71,
+    "enabled": true
+  },
+  {
+    "id": "fan-vibration-maximum",
+    "name": "Fan 03 Vibration Below 4",
+    "deviceId": "FAN-03",
+    "metric": "vibration",
+    "operator": "LessThan",
+    "threshold": 4,
+    "enabled": true
+  },
+  {
+    "id": "compressor-temperature-maximum",
+    "name": "Compressor Temperature At Most 70",
+    "deviceId": "COMP-01",
+    "metric": "temperature",
+    "operator": "LessThanOrEqual",
+    "threshold": 70,
+    "enabled": true
+  },
+  {
+    "id": "compressor-vibration-target",
+    "name": "Compressor Vibration Equals 1.632",
+    "deviceId": "COMP-01",
+    "metric": "vibration",
+    "operator": "Equal",
+    "threshold": 1.632,
     "enabled": true
   },
   {
     "id": "pressure-range",
-    "name": "Pressure Range",
+    "name": "Pressure Between 2 And 10",
     "metric": "pressure",
     "operator": "Between",
     "lowerBound": 2,
-    "upperBound": 5,
+    "upperBound": 10,
     "enabled": true
   },
   {
     "id": "sustained-temperature",
-    "name": "Sustained Temperature",
+    "name": "Pump 01 Sustained Temperature Above 69",
     "deviceId": "PUMP-01",
     "metric": "temperature",
     "operator": "SustainedAbove",
-    "threshold": 80,
+    "threshold": 69,
     "durationSeconds": 30,
     "enabled": true
   }
