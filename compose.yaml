@@ -12,8 +12,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTP_PORTS: 8080
-      Input__Path: /app/storage/readings.jsonl
-      Input__ProcessOnStartup: "false"
+      Input__Path: /app/data/readings.jsonl
+      Input__ProcessOnStartup: "true"
       Persistence__DatabasePath: /app/storage/sensor-ingestion.db
       RuleConfiguration__Path: /app/data/rules.json
     volumes:
