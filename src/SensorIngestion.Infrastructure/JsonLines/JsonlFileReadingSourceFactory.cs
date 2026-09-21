@@ -1,4 +1,4 @@
-using SensorIngestion.Application.Ingestion;
+using SensorIngestion.Application.Abstractions.Ingestion;
 
 namespace SensorIngestion.Infrastructure.JsonLines;
 

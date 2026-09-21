@@ -18,14 +18,11 @@ public sealed class RuleEvaluation : Entity
 
     private RuleEvaluation(long sensorReadingId, long ruleId, RuleEvaluationOutcome outcome, string? reason, DateTimeOffset evaluatedAt)
     {
-        if (sensorReadingId <= 0)
-            throw new ArgumentOutOfRangeException(nameof(sensorReadingId), "rule evaluation sensor reading id is required");
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(sensorReadingId, 0);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(ruleId, 0);
 
-        if (ruleId <= 0)
-            throw new ArgumentOutOfRangeException(nameof(ruleId), "rule evaluation rule id is required");
-
-        if (outcome == RuleEvaluationOutcome.Violated && string.IsNullOrWhiteSpace(reason))
-            throw new ArgumentException("violation reason is required", nameof(reason));
+        if (outcome == RuleEvaluationOutcome.Violated)
+            ArgumentException.ThrowIfNullOrWhiteSpace(reason);
 
         SensorReadingId = sensorReadingId;
         RuleId = ruleId;

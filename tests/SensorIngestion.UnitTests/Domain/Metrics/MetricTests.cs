@@ -13,12 +13,17 @@ public sealed class MetricTests
     }
 
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Create_WhenValueIsBlank_ShouldThrowArgumentNullException(string? value)
+    public void Create_WhenValueIsBlank_ShouldThrowArgumentException(string? value)
     {
-        Assert.Throws<ArgumentNullException>(() => Metric.Create(value!));
+        Assert.Throws<ArgumentException>(() => Metric.Create(value!));
+    }
+
+    [Fact]
+    public void Create_WhenValueIsNull_ShouldThrowArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => Metric.Create(null!));
     }
 
     [Fact]

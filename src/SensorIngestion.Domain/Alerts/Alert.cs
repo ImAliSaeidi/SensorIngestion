@@ -39,9 +39,7 @@ public class Alert : Entity
 
     public static Alert Create(AlertCandidate candidate, DateTimeOffset createdAt)
     {
-        if (candidate == null)
-            throw new ArgumentNullException(nameof(candidate), "alert candidate is required");
-
+        ArgumentNullException.ThrowIfNull(candidate);
         return new Alert(candidate, createdAt);
     }
 }

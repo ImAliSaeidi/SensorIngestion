@@ -1,6 +1,5 @@
-﻿using SensorIngestion.Application.Rules.Configuration;
-using SensorIngestion.Domain.Metrics;
-using SensorIngestion.Domain.Rules;
+﻿using SensorIngestion.Application.Abstractions.Rules.Configuration;
+using SensorIngestion.Application.Rules.Configuration;
 using SensorIngestion.Infrastructure.RuleConfiguration.Models;
 using System.Text.Json;
 
@@ -12,8 +11,7 @@ public class JsonRuleConfigurationLoader : IRuleConfigurationLoader
 
     public JsonRuleConfigurationLoader(string path)
     {
-        if (string.IsNullOrWhiteSpace(path))
-            throw new ArgumentException("Rule configuration path is required.", nameof(path));
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         _path = path;
     }
@@ -37,40 +35,6 @@ public class JsonRuleConfigurationLoader : IRuleConfigurationLoader
         if (ruleDtos is null)
             throw new InvalidDataException("Rule configuration must contain a JSON array.");
 
-        RuleConfigurationValidator.Validate(ruleDtos);
-
-        return ruleDtos
-            .Select(CreateDefinition)
-            .ToList()
-            .AsReadOnly();
-    }
-
-    private static RuleDefinition CreateDefinition(RuleJsonDto dto)
-    {
-        var ruleKey = dto.Id!.Trim();
-        var name = dto.Name!.Trim();
-        var metric = Metric.Create(dto.Metric!);
-        var deviceId = string.IsNullOrWhiteSpace(dto.DeviceId) ? null : dto.DeviceId.Trim();
-        var @operator = RuleOperator.Create(dto.Operator!);
-        var parameters = RuleParameterMapper.Map(dto);
-
-        var hash = RuleConfigurationHasher.Compute(
-            ruleKey,
-            name,
-            dto.Enabled!.Value,
-            metric.Value,
-            deviceId,
-            @operator.Value,
-            parameters);
-
-        return new RuleDefinition(
-            ruleKey,
-            name,
-            dto.Enabled.Value,
-            metric,
-            deviceId,
-            @operator,
-            parameters,
-            hash);
+        return RuleDefinitionFactory.CreateAll(ruleDtos);
     }
 }

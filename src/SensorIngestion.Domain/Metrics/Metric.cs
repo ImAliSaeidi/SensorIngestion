@@ -17,9 +17,7 @@ public sealed record Metric
 
     public static Metric Create(string value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            throw new ArgumentNullException(nameof(value), "metric value cannot be empty");
-
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
         return new Metric(value.Trim().ToLowerInvariant());
     }
 }

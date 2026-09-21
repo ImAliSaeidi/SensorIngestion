@@ -14,8 +14,7 @@ public sealed record ReadingRejection
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(lineNumber);
 
-        if (string.IsNullOrWhiteSpace(reason))
-            throw new ArgumentException("Rejection reason is required.", nameof(reason));
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
 
         LineNumber = lineNumber;
         Category = category;

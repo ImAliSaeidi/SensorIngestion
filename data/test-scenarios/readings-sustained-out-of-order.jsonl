@@ -1,0 +1,9 @@
+{"deviceId":"SA-01","metric":"temperature","ts":"2025-06-01T10:02:30Z","value":86,"seq":5}
+{"deviceId":"SA-01","metric":"temperature","ts":"2025-06-01T10:00:00Z","value":81,"seq":1}
+{"deviceId":"SA-01","metric":"temperature","ts":"2025-06-01T10:06:40Z","value":80,"seq":9}
+{"deviceId":"SA-01","metric":"temperature","ts":"2025-06-01T10:00:40Z","value":80,"seq":3}
+{"deviceId":"SA-01","metric":"temperature","ts":"2025-06-01T10:02:00Z","value":82,"seq":4}
+{"deviceId":"SA-01","metric":"temperature","ts":"2025-06-01T10:06:00Z","value":83,"seq":7}
+{"deviceId":"SA-01","metric":"temperature","ts":"2025-06-01T10:00:30Z","value":85,"seq":2}
+{"deviceId":"SA-01","metric":"temperature","ts":"2025-06-01T10:02:40Z","value":80,"seq":6}
+{"deviceId":"SA-01","metric":"temperature","ts":"2025-06-01T10:06:30Z","value":88,"seq":8}

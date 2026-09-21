@@ -8,7 +8,7 @@ using SensorIngestion.Domain.Alerts;
 using SensorIngestion.Domain.Metrics;
 using SensorIngestion.Domain.Readings;
 using SensorIngestion.Domain.Rules;
-using SensorIngestion.Infrastructure.Persistence;
+using SensorIngestion.Infrastructure.Persistence.EF;
 
 namespace SensorIngestion.IntegrationTests.Persistence;
 
@@ -20,7 +20,7 @@ public sealed class SqlitePersistenceTests
     public async Task RuleCatalog_WhenConfigurationIsRepeatedOrChanged_ShouldReuseOrVersionRules()
     {
         await using var fixture = await SqliteFixture.CreateAsync();
-        var catalog = new EfRuleCatalog(fixture.Context);
+        var catalog = new RuleCatalog(fixture.Context);
         var original = CreateDefinition("hash-1", threshold: 80);
 
         var first = Assert.Single(await catalog.SynchronizeAsync([original], Start, CancellationToken.None));
@@ -42,7 +42,7 @@ public sealed class SqlitePersistenceTests
         reading.Classify(hasViolation: true);
         var evaluation = new RuleEvaluationDraft(reading, rule, true, "Temperature exceeded threshold.");
         var alert = Alert.Create(new AlertCandidate(rule.Id, reading.DeviceId, reading.Metric, Start, Start.AddMinutes(1), 90, false), Start.AddHours(1));
-        var persistence = new EfIngestionPersistence(fixture.Context);
+        var persistence = new IngestionPersistence(fixture.Context);
 
         var first = await persistence.PersistAsync(CreateRequest("fingerprint", [reading], [evaluation], [alert]), CancellationToken.None);
         var second = await persistence.PersistAsync(CreateRequest("fingerprint", [reading], [evaluation], [alert]), CancellationToken.None);
@@ -66,7 +66,7 @@ public sealed class SqlitePersistenceTests
         var reading = new SensorReading("PUMP-01", Metric.Temperature, Start, 90, 1);
         reading.Classify(hasViolation: false);
         var invalidAlert = Alert.Create(new AlertCandidate(999, reading.DeviceId, reading.Metric, Start, Start.AddMinutes(1), 90, false), Start.AddHours(1));
-        var persistence = new EfIngestionPersistence(fixture.Context);
+        var persistence = new IngestionPersistence(fixture.Context);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => persistence.PersistAsync(CreateRequest("failed", [reading], [], [invalidAlert]), CancellationToken.None));
 
@@ -91,7 +91,7 @@ public sealed class SqlitePersistenceTests
 
     private static async Task<Rule> PersistRuleAsync(SensorIngestionDbContext context)
     {
-        var catalog = new EfRuleCatalog(context);
+        var catalog = new RuleCatalog(context);
         return Assert.Single(await catalog.SynchronizeAsync([CreateDefinition("hash-1", 80)], Start, CancellationToken.None));
     }
 

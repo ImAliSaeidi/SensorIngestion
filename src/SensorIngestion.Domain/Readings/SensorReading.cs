@@ -24,16 +24,16 @@ public sealed class SensorReading : Entity
 
     public SensorReading(string deviceId, Metric metric, DateTimeOffset timestamp, double value, long sequence)
     {
-        if (string.IsNullOrWhiteSpace(deviceId))
-            throw new ArgumentNullException(nameof(deviceId), "device id cannot be null");
+        ArgumentException.ThrowIfNullOrWhiteSpace(deviceId);
 
         if (!double.IsFinite(value))
             throw new ArgumentException("sensor value must be finite", nameof(value));
 
         ArgumentOutOfRangeException.ThrowIfNegative(sequence);
+        ArgumentNullException.ThrowIfNull(metric);
 
-        DeviceId = deviceId.Trim();
-        Metric = metric ?? throw new ArgumentNullException(nameof(metric), "metric cannot be null");
+        DeviceId = deviceId.Trim().ToUpperInvariant();
+        Metric = metric;
         Timestamp = timestamp.ToUniversalTime();
         Value = value;
         Sequence = sequence;

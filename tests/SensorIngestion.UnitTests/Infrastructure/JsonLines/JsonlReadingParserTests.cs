@@ -64,14 +64,15 @@ public sealed class JsonlReadingParserTests
     }
 
     [Fact]
-    public void Parse_WhenJsonObjectHasInvalidFieldType_ShouldReturnParsedRejection()
+    public void Parse_WhenJsonObjectHasInvalidFieldType_ShouldReturnMalformedRejection()
     {
         const string content = """{"deviceId":"PUMP-01","metric":"temperature","ts":"2025-06-01T08:33:00Z","value":"67.21","seq":1199}""";
 
         var result = Parse(content);
 
         AssertRejected(result);
-        Assert.True(result.WasParsed);
+        Assert.False(result.WasParsed);
+        Assert.Equal(RejectionCategory.MalformedInput, result.Rejection!.Category);
     }
 
     [Fact]

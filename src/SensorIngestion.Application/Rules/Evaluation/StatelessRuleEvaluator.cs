@@ -9,7 +9,8 @@ public sealed class StatelessRuleEvaluator
 
     public StatelessRuleEvaluator(RuleOperatorRegistry registry)
     {
-        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        ArgumentNullException.ThrowIfNull(registry);
+        _registry = registry;
     }
 
     public ReadingEvaluationResult Evaluate(SensorReading reading, IEnumerable<Rule> rules)
@@ -18,7 +19,6 @@ public sealed class StatelessRuleEvaluator
         ArgumentNullException.ThrowIfNull(rules);
 
         var decisions = new List<RuleEvaluationDecision>();
-        var violations = new List<RuleEvaluationDecision>();
 
         foreach (var rule in rules)
         {
@@ -31,21 +31,9 @@ public sealed class StatelessRuleEvaluator
             var operatorResult = strategy.Evaluate(reading.Value, rule.Parameters);
             var isViolated = !operatorResult.IsSatisfied;
 
-            var decision = new RuleEvaluationDecision(
-                rule.RuleKey,
-                rule.Name,
-                rule.Operator,
-                isViolated,
-                isViolated ? operatorResult.Explanation : null);
-
-            decisions.Add(decision);
-
-            if (isViolated)
-                violations.Add(decision);
+            decisions.Add(new RuleEvaluationDecision(rule, isViolated, isViolated ? operatorResult.Explanation : null));
         }
 
-        reading.Classify(violations.Count > 0);
-
-        return new ReadingEvaluationResult(decisions.AsReadOnly(), violations.AsReadOnly());
+        return new ReadingEvaluationResult(decisions.AsReadOnly());
     }
 }

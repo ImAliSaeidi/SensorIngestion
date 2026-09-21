@@ -10,8 +10,8 @@ public sealed class OperatorEvaluationResult
     {
         IsSatisfied = isSatisfied;
 
-        if (!isSatisfied && string.IsNullOrWhiteSpace(explanation))
-            throw new ArgumentNullException(nameof(explanation), "explanation is required for not satisfied operator");
+        if (!isSatisfied)
+            ArgumentException.ThrowIfNullOrWhiteSpace(explanation);
 
         Explanation = explanation;
     }

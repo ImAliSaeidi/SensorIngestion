@@ -11,7 +11,7 @@ public sealed class AlertCandidateTests
         var start = new DateTimeOffset(2025, 6, 1, 12, 0, 0, TimeSpan.FromHours(3.5));
         var end = start.AddMinutes(1);
 
-        var candidate = new AlertCandidate(1, "  PUMP-01  ", Metric.Temperature, start, end, 90, true);
+        var candidate = new AlertCandidate(1, "  pump-01  ", Metric.Temperature, start, end, 90, true);
 
         Assert.Equal(1, candidate.RuleId);
         Assert.Equal("PUMP-01", candidate.DeviceId);
@@ -41,12 +41,17 @@ public sealed class AlertCandidateTests
     }
 
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Constructor_WhenDeviceIdIsBlank_ShouldThrowArgumentNullException(string? deviceId)
+    public void Constructor_WhenDeviceIdIsBlank_ShouldThrowArgumentException(string? deviceId)
     {
-        Assert.Throws<ArgumentNullException>(() => CreateCandidate(deviceId: deviceId!));
+        Assert.Throws<ArgumentException>(() => CreateCandidate(deviceId: deviceId!));
+    }
+
+    [Fact]
+    public void Constructor_WhenDeviceIdIsNull_ShouldThrowArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => CreateCandidate(deviceId: null!));
     }
 
     [Fact]

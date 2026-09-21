@@ -1,3 +1,4 @@
+using SensorIngestion.Application.Abstractions.Rules.Evaluation;
 using SensorIngestion.Application.Rules;
 using SensorIngestion.Application.Rules.Evaluation;
 using SensorIngestion.Domain.Metrics;
@@ -54,11 +55,11 @@ public sealed class StatelessRuleEvaluatorTests
         Assert.Equal(0, strategy.CallCount);
         Assert.Empty(result.Decisions);
         Assert.Empty(result.Violations);
-        Assert.Equal(ReadingClassification.Acceptable, reading.Classification);
+        Assert.Equal(ReadingClassification.Pending, reading.Classification);
     }
 
     [Fact]
-    public void Evaluate_WhenNoRulesApply_ShouldClassifyReadingAsAcceptable()
+    public void Evaluate_WhenNoRulesApply_ShouldLeaveClassificationUnchanged()
     {
         var evaluator = CreateEvaluator(new RecordingOperatorStrategy("Test", isSatisfied: false));
         var reading = CreateReading();
@@ -68,11 +69,11 @@ public sealed class StatelessRuleEvaluatorTests
         Assert.True(result.IsAcceptable);
         Assert.Empty(result.Decisions);
         Assert.Empty(result.Violations);
-        Assert.Equal(ReadingClassification.Acceptable, reading.Classification);
+        Assert.Equal(ReadingClassification.Pending, reading.Classification);
     }
 
     [Fact]
-    public void Evaluate_WhenEveryApplicableRuleIsSatisfied_ShouldClassifyReadingAsAcceptable()
+    public void Evaluate_WhenEveryApplicableRuleIsSatisfied_ShouldLeaveClassificationUnchanged()
     {
         var first = new RecordingOperatorStrategy("First", isSatisfied: true);
         var second = new RecordingOperatorStrategy("Second", isSatisfied: true);
@@ -84,24 +85,26 @@ public sealed class StatelessRuleEvaluatorTests
         Assert.True(result.IsAcceptable);
         Assert.Equal(2, result.Decisions.Count);
         Assert.Empty(result.Violations);
-        Assert.Equal(ReadingClassification.Acceptable, reading.Classification);
+        Assert.Equal(ReadingClassification.Pending, reading.Classification);
     }
 
     [Fact]
-    public void Evaluate_WhenAnApplicableRuleIsViolated_ShouldClassifyReadingAsUnacceptable()
+    public void Evaluate_WhenAnApplicableRuleIsViolated_ShouldReturnViolationWithoutChangingClassification()
     {
         var evaluator = CreateEvaluator(new RecordingOperatorStrategy("Test", isSatisfied: false, explanation: "Value 75 does not satisfy the rule."));
         var reading = CreateReading(value: 75);
+        var rule = CreateRule(ruleKey: "minimum-temperature", name: "Minimum temperature");
 
-        var result = evaluator.Evaluate(reading, [CreateRule(ruleKey: "minimum-temperature", name: "Minimum temperature")]);
+        var result = evaluator.Evaluate(reading, [rule]);
 
         Assert.False(result.IsAcceptable);
         var violation = Assert.Single(result.Violations);
         Assert.Equal("minimum-temperature", violation.RuleKey);
         Assert.Equal("Minimum temperature", violation.RuleName);
         Assert.Equal(RuleOperator.Create("Test"), violation.Operator);
+        Assert.Same(rule, violation.Rule);
         Assert.Equal("Value 75 does not satisfy the rule.", violation.Explanation);
-        Assert.Equal(ReadingClassification.Unacceptable, reading.Classification);
+        Assert.Equal(ReadingClassification.Pending, reading.Classification);
     }
 
     [Fact]
@@ -125,7 +128,7 @@ public sealed class StatelessRuleEvaluatorTests
         Assert.Collection(result.Violations,
             violation => Assert.Equal("rule-1", violation.RuleKey),
             violation => Assert.Equal("rule-2", violation.RuleKey));
-        Assert.Equal(ReadingClassification.Unacceptable, reading.Classification);
+        Assert.Equal(ReadingClassification.Pending, reading.Classification);
     }
 
     [Fact]

@@ -16,7 +16,7 @@ public sealed class JsonRuleConfigurationLoaderTests
               { "id": "less-than", "name": "Less than", "metric": "pressure", "operator": "LessThan", "threshold": 2, "enabled": true },
               { "id": "less-than-or-equal", "name": "Less than or equal", "metric": "pressure", "operator": "LessThanOrEqual", "threshold": 2, "enabled": true },
               { "id": "equal", "name": "Equal", "metric": "vibration", "operator": "Equal", "threshold": 0, "enabled": true },
-              { "id": "between", "name": "Between", "deviceId": "PUMP-01", "metric": "pressure", "operator": "Between", "lowerBound": 2, "upperBound": 5, "enabled": false },
+              { "id": "between", "name": "Between", "deviceId": "pump-01", "metric": "pressure", "operator": "Between", "lowerBound": 2, "upperBound": 5, "enabled": false },
               { "id": "sustained", "name": "Sustained", "deviceId": "PUMP-01", "metric": "temperature", "operator": "SustainedAbove", "threshold": 80, "durationSeconds": 30, "enabled": true }
             ]
             """;

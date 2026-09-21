@@ -14,12 +14,17 @@ public sealed class RuleParameterTests
     }
 
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Create_WhenNameIsBlank_ShouldThrowArgumentNullException(string? name)
+    public void Create_WhenNameIsBlank_ShouldThrowArgumentException(string? name)
     {
-        Assert.Throws<ArgumentNullException>(() => RuleParameter.Create(name!, 1));
+        Assert.Throws<ArgumentException>(() => RuleParameter.Create(name!, 1));
+    }
+
+    [Fact]
+    public void Create_WhenNameIsNull_ShouldThrowArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => RuleParameter.Create(null!, 1));
     }
 
     [Theory]

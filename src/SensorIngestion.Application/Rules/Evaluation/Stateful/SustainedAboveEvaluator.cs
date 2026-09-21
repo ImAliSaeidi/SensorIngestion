@@ -1,19 +1,24 @@
+using SensorIngestion.Application.Abstractions.Rules.Evaluation.Stateful;
 using SensorIngestion.Application.Ingestion.Preprocessing;
 using SensorIngestion.Domain.Readings;
 using SensorIngestion.Domain.Rules;
 
 namespace SensorIngestion.Application.Rules.Evaluation.Stateful;
 
-public sealed class SustainedAboveEvaluator
+public sealed class SustainedAboveEvaluator : IStatefulRuleEvaluator
 {
-    public SustainedAboveEvaluationResult Evaluate(IReadOnlyCollection<ReadingStream> streams, IReadOnlyCollection<Rule> rules)
+    public RuleOperator Operator { get; } = RuleOperator.Create(RuleOperatorNames.SustainedAbove);
+
+    public StatefulRuleEvaluationResult Evaluate(IReadOnlyCollection<ReadingStream> streams, Rule rule)
     {
         ArgumentNullException.ThrowIfNull(streams);
-        ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(rule);
+
+        if (rule.Operator != Operator)
+            throw new ArgumentException($"Evaluator '{Operator.Value}' cannot evaluate operator '{rule.Operator.Value}'.", nameof(rule));
 
         var decisions = new List<ReadingRuleEvaluationDecision>();
-        var episodes = new List<SustainedEpisode>();
-        var sustainedRules = rules.Where(IsSustainedAbove).ToArray();
+        var episodes = new List<RuleViolationEpisode>();
 
         foreach (var stream in streams)
         {
@@ -23,14 +28,14 @@ public sealed class SustainedAboveEvaluator
             if (firstReading is null)
                 continue;
 
-            foreach (var rule in sustainedRules.Where(rule => rule.AppliesTo(firstReading)))
+            if (rule.AppliesTo(firstReading))
                 EvaluateStream(stream, rule, decisions, episodes);
         }
 
-        return new SustainedAboveEvaluationResult(decisions, episodes);
+        return new StatefulRuleEvaluationResult(decisions, episodes);
     }
 
-    private static void EvaluateStream(ReadingStream stream, Rule rule, ICollection<ReadingRuleEvaluationDecision> decisions, ICollection<SustainedEpisode> episodes)
+    private static void EvaluateStream(ReadingStream stream, Rule rule, ICollection<ReadingRuleEvaluationDecision> decisions, ICollection<RuleViolationEpisode> episodes)
     {
         var threshold = GetRequiredParameter(rule, RuleParameterNames.Threshold);
         var durationSeconds = GetRequiredParameter(rule, RuleParameterNames.DurationSeconds);
@@ -57,16 +62,14 @@ public sealed class SustainedAboveEvaluator
                     isConfirmed = true;
 
                 AddDecision(reading, rule, threshold, durationSeconds, isConfirmed, decisions);
-                ApplyClassification(reading, isConfirmed);
                 continue;
             }
 
             AddDecision(reading, rule, threshold, durationSeconds, isViolated: false, decisions);
-            ApplyClassification(reading, isViolated: false);
 
             if (episodeStart is not null && isConfirmed)
             {
-                episodes.Add(new SustainedEpisode(
+                episodes.Add(new RuleViolationEpisode(
                     rule,
                     stream.DeviceId,
                     stream.Metric,
@@ -83,7 +86,7 @@ public sealed class SustainedAboveEvaluator
 
         if (episodeStart is not null && isConfirmed)
         {
-            episodes.Add(new SustainedEpisode(
+            episodes.Add(new RuleViolationEpisode(
                 rule,
                 stream.DeviceId,
                 stream.Metric,
@@ -100,20 +103,8 @@ public sealed class SustainedAboveEvaluator
             ? $"Value remained above threshold {threshold} for at least {durationSeconds} seconds."
             : null;
 
-        var decision = new RuleEvaluationDecision(rule.RuleKey, rule.Name, rule.Operator, isViolated, explanation);
+        var decision = new RuleEvaluationDecision(rule, isViolated, explanation);
         decisions.Add(new ReadingRuleEvaluationDecision(reading, decision));
-    }
-
-    private static void ApplyClassification(SensorReading reading, bool isViolated)
-    {
-        if (isViolated)
-        {
-            reading.Classify(hasViolation: true);
-            return;
-        }
-
-        if (reading.Classification == ReadingClassification.Pending)
-            reading.Classify(hasViolation: false);
     }
 
     private static double GetRequiredParameter(Rule rule, string parameterName)
@@ -123,11 +114,5 @@ public sealed class SustainedAboveEvaluator
         return parameter == null
             ? throw new InvalidOperationException($"Rule '{rule.RuleKey}' does not contain required parameter '{parameterName}'.")
             : parameter.Value;
-    }
-
-    private static bool IsSustainedAbove(Rule rule)
-    {
-        ArgumentNullException.ThrowIfNull(rule);
-        return string.Equals(rule.Operator.Value, RuleOperatorNames.SustainedAbove, StringComparison.Ordinal);
     }
 }

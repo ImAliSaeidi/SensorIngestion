@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 using SensorIngestion.Api.Contracts.Responses;
 using SensorIngestion.Domain.Metrics;
 using SensorIngestion.Domain.Readings;
-using SensorIngestion.Infrastructure.Persistence;
+using SensorIngestion.Infrastructure.Persistence.EF;
 using System.Net;
 using System.Net.Http.Json;
 

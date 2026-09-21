@@ -1,0 +1,67 @@
+[
+  {
+    "id": "greater-than-temperature",
+    "name": "Requires Temperature Greater Than 50",
+    "deviceId": "GT-01",
+    "metric": "temperature",
+    "operator": "GreaterThan",
+    "threshold": 50,
+    "enabled": true
+  },
+  {
+    "id": "greater-than-or-equal-temperature",
+    "name": "Requires Temperature Greater Than Or Equal To 50",
+    "deviceId": "GTE-01",
+    "metric": "temperature",
+    "operator": "GreaterThanOrEqual",
+    "threshold": 50,
+    "enabled": true
+  },
+  {
+    "id": "less-than-pressure",
+    "name": "Requires Pressure Less Than 10",
+    "deviceId": "LT-01",
+    "metric": "pressure",
+    "operator": "LessThan",
+    "threshold": 10,
+    "enabled": true
+  },
+  {
+    "id": "less-than-or-equal-pressure",
+    "name": "Requires Pressure Less Than Or Equal To 10",
+    "deviceId": "LTE-01",
+    "metric": "pressure",
+    "operator": "LessThanOrEqual",
+    "threshold": 10,
+    "enabled": true
+  },
+  {
+    "id": "equal-vibration",
+    "name": "Requires Vibration Equal To 5",
+    "deviceId": "EQ-01",
+    "metric": "vibration",
+    "operator": "Equal",
+    "threshold": 5,
+    "enabled": true
+  },
+  {
+    "id": "between-pressure",
+    "name": "Requires Pressure Between 2 And 5 Inclusive",
+    "deviceId": "BETWEEN-01",
+    "metric": "pressure",
+    "operator": "Between",
+    "lowerBound": 2,
+    "upperBound": 5,
+    "enabled": true
+  },
+  {
+    "id": "sustained-temperature",
+    "name": "Overheating Sustained",
+    "deviceId": "SA-01",
+    "metric": "temperature",
+    "operator": "SustainedAbove",
+    "threshold": 80,
+    "durationSeconds": 30,
+    "enabled": true
+  }
+]

@@ -1,32 +1,12 @@
 using SensorIngestion.Application.Alerting;
-using SensorIngestion.Application.Rules;
-using SensorIngestion.Application.Rules.Evaluation.Stateful;
 using SensorIngestion.Domain.Alerts;
 using SensorIngestion.Domain.Metrics;
-using SensorIngestion.Domain.Rules;
 
 namespace SensorIngestion.UnitTests.Application.Alerting;
 
 public sealed class AlertGeneratorTests
 {
     private static readonly DateTimeOffset Start = new(2025, 6, 1, 8, 0, 0, TimeSpan.Zero);
-
-    [Fact]
-    public void CandidateFactory_WhenEpisodeIsConfirmed_ShouldCopyEpisodeData()
-    {
-        var rule = CreateRule();
-        var episode = new SustainedEpisode(rule, "PUMP-01", Metric.Temperature, Start, Start.AddSeconds(40), 92, false);
-
-        var candidate = AlertCandidateFactory.Create(episode, persistedRuleId: 12);
-
-        Assert.Equal(12, candidate.RuleId);
-        Assert.Equal(episode.DeviceId, candidate.DeviceId);
-        Assert.Equal(episode.Metric, candidate.Metric);
-        Assert.Equal(episode.StartTimestamp, candidate.StartTimestamp);
-        Assert.Equal(episode.EndTimestamp, candidate.EndTimestamp);
-        Assert.Equal(episode.PeakValue, candidate.PeakValue);
-        Assert.Equal(episode.IsOpen, candidate.IsOpen);
-    }
 
     [Fact]
     public void Generate_WhenOneEpisodeHasManyViolatingReadings_ShouldCreateOneAlertForItsSingleCandidate()
@@ -106,16 +86,4 @@ public sealed class AlertGeneratorTests
     private static AlertCandidate CreateCandidate(long ruleId, DateTimeOffset start, DateTimeOffset end, string deviceId = "PUMP-01", Metric? metric = null)
         => new(ruleId, deviceId, metric ?? Metric.Temperature, start, end, 90, false);
 
-    private static Rule CreateRule()
-        => new(
-            "sustained-temperature",
-            1,
-            "Sustained temperature",
-            true,
-            Metric.Temperature,
-            null,
-            RuleOperator.Create(RuleOperatorNames.SustainedAbove),
-            [RuleParameter.Create(RuleParameterNames.Threshold, 80), RuleParameter.Create(RuleParameterNames.DurationSeconds, 30)],
-            "hash",
-            Start);
 }

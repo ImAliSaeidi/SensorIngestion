@@ -14,15 +14,14 @@ public sealed record AlertIdentity
 
     public AlertIdentity(long ruleId, string deviceId, Metric metric, DateTimeOffset startTimestamp)
     {
-        if (ruleId <= 0)
-            throw new ArgumentOutOfRangeException(nameof(ruleId), "alert identity rule id is required");
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(ruleId, 0);
+        ArgumentException.ThrowIfNullOrWhiteSpace(deviceId);
 
-        if (string.IsNullOrWhiteSpace(deviceId))
-            throw new ArgumentNullException(nameof(deviceId), "alert identity device id is required");
+        ArgumentNullException.ThrowIfNull(metric);
 
         RuleId = ruleId;
         DeviceId = deviceId.Trim().ToUpperInvariant();
-        Metric = metric ?? throw new ArgumentNullException(nameof(metric), "alert identity metric is required");
+        Metric = metric;
         StartTimestamp = startTimestamp.ToUniversalTime();
     }
 }

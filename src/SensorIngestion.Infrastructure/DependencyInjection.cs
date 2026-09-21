@@ -1,11 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using SensorIngestion.Application.Ingestion;
+using SensorIngestion.Application.Abstractions.Aggregation;
+using SensorIngestion.Application.Abstractions.Ingestion;
+using SensorIngestion.Application.Abstractions.Persistence;
 using SensorIngestion.Application.Aggregation;
-using SensorIngestion.Application.Persistence;
+using SensorIngestion.Application.Ingestion;
 using SensorIngestion.Infrastructure.JsonLines;
-using SensorIngestion.Infrastructure.Persistence;
+using SensorIngestion.Infrastructure.Persistence.EF;
 
 namespace SensorIngestion.Infrastructure;
 
@@ -19,9 +21,9 @@ public static class DependencyInjection
         Directory.CreateDirectory(Path.GetDirectoryName(resolvedPath)!);
 
         services.AddDbContext<SensorIngestionDbContext>(options => options.UseSqlite($"Data Source={resolvedPath}"));
-        services.AddScoped<IRuleCatalog, EfRuleCatalog>();
-        services.AddScoped<IIngestionPersistence, EfIngestionPersistence>();
-        services.AddScoped<IReadingAggregationStore, EfReadingAggregationStore>();
+        services.AddScoped<IRuleCatalog, RuleCatalog>();
+        services.AddScoped<IIngestionPersistence, IngestionPersistence>();
+        services.AddScoped<IReadingAggregationStore, ReadingAggregationStore>();
         services.AddScoped<GetReadingAggregates>();
         services.AddSingleton<IReadingParser, JsonlReadingParser>();
         services.AddSingleton<IReadingSourceFactory, JsonlFileReadingSourceFactory>();

@@ -1,3 +1,4 @@
+using SensorIngestion.Application.Abstractions.Ingestion;
 using SensorIngestion.Application.Ingestion;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -10,8 +11,7 @@ public sealed class JsonlFileReadingSource : IReadingSource
 
     public JsonlFileReadingSource(string path)
     {
-        if (string.IsNullOrWhiteSpace(path))
-            throw new ArgumentException("input file path is required", nameof(path));
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         _path = path;
     }

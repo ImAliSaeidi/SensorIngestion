@@ -32,20 +32,13 @@ public sealed class Rule : Entity
 
     public Rule(string ruleKey, int version, string name, bool enabled, Metric metric, string? deviceId, RuleOperator @operator, IEnumerable<RuleParameter> parameters, string configurationHash, DateTimeOffset createdAt)
     {
-        if (string.IsNullOrWhiteSpace(ruleKey))
-            throw new ArgumentNullException(nameof(ruleKey), "rule key is required");
-
-        if (version <= 0)
-            throw new ArgumentOutOfRangeException(nameof(version), "rule version must be grater than zero");
-
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentNullException(nameof(name), "rule name is required");
-
-        if (string.IsNullOrWhiteSpace(configurationHash))
-            throw new ArgumentNullException(nameof(configurationHash), "rule configuration hash is required");
-
-        if (parameters == null)
-            throw new ArgumentNullException(nameof(parameters), "rule parameters is required");
+        ArgumentException.ThrowIfNullOrWhiteSpace(ruleKey);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(version, 0);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(configurationHash);
+        ArgumentNullException.ThrowIfNull(parameters);
+        ArgumentNullException.ThrowIfNull(metric);
+        ArgumentNullException.ThrowIfNull(@operator);
 
         var parametersList = parameters.ToList();
 
@@ -60,9 +53,9 @@ public sealed class Rule : Entity
         Version = version;
         Name = name.Trim();
         Enabled = enabled;
-        Metric = metric ?? throw new ArgumentNullException(nameof(metric), "rule metric is required");
-        DeviceId = string.IsNullOrWhiteSpace(deviceId) ? null : deviceId.Trim();
-        Operator = @operator ?? throw new ArgumentNullException(nameof(@operator), "rule operator is required");
+        Metric = metric;
+        DeviceId = string.IsNullOrWhiteSpace(deviceId) ? null : deviceId.Trim().ToUpperInvariant();
+        Operator = @operator;
         ConfigurationHash = configurationHash.Trim();
         CreatedAt = createdAt.ToUniversalTime();
         _parameters.AddRange(parametersList);

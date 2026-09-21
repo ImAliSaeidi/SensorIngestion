@@ -1,0 +1,16 @@
+{"deviceId":"GT-01","metric":"temperature","ts":"2025-06-01T09:00:00Z","value":60,"seq":1}
+{"deviceId":"GT-01","metric":"temperature","ts":"2025-06-01T09:00:01Z","value":50,"seq":2}
+{"deviceId":"GTE-01","metric":"temperature","ts":"2025-06-01T09:01:00Z","value":50,"seq":1}
+{"deviceId":"GTE-01","metric":"temperature","ts":"2025-06-01T09:01:01Z","value":49,"seq":2}
+{"deviceId":"LT-01","metric":"pressure","ts":"2025-06-01T09:02:00Z","value":9,"seq":1}
+{"deviceId":"LT-01","metric":"pressure","ts":"2025-06-01T09:02:01Z","value":10,"seq":2}
+{"deviceId":"LTE-01","metric":"pressure","ts":"2025-06-01T09:03:00Z","value":10,"seq":1}
+{"deviceId":"LTE-01","metric":"pressure","ts":"2025-06-01T09:03:01Z","value":11,"seq":2}
+{"deviceId":"EQ-01","metric":"vibration","ts":"2025-06-01T09:04:00Z","value":5,"seq":1}
+{"deviceId":"EQ-01","metric":"vibration","ts":"2025-06-01T09:04:01Z","value":4,"seq":2}
+{"deviceId":"BETWEEN-01","metric":"pressure","ts":"2025-06-01T09:05:00Z","value":2,"seq":1}
+{"deviceId":"BETWEEN-01","metric":"pressure","ts":"2025-06-01T09:05:01Z","value":5,"seq":2}
+{"deviceId":"BETWEEN-01","metric":"pressure","ts":"2025-06-01T09:05:02Z","value":6,"seq":3}
+{"deviceId":"SA-01","metric":"temperature","ts":"2025-06-01T09:10:00Z","value":81,"seq":1}
+{"deviceId":"SA-01","metric":"temperature","ts":"2025-06-01T09:10:30Z","value":85,"seq":2}
+{"deviceId":"SA-01","metric":"temperature","ts":"2025-06-01T09:10:40Z","value":80,"seq":3}

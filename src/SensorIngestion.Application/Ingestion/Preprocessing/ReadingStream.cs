@@ -13,8 +13,7 @@ public sealed class ReadingStream
 
     internal ReadingStream(string deviceId, Metric metric, IEnumerable<SensorReading> readings)
     {
-        if (string.IsNullOrWhiteSpace(deviceId))
-            throw new ArgumentNullException(nameof(deviceId), "device id is required");
+        ArgumentException.ThrowIfNullOrWhiteSpace(deviceId);
 
         ArgumentNullException.ThrowIfNull(metric);
         ArgumentNullException.ThrowIfNull(readings);

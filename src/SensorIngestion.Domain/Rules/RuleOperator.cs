@@ -11,9 +11,7 @@ public sealed record RuleOperator
 
     public static RuleOperator Create(string value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            throw new ArgumentNullException(nameof(value), "rule operator cannot be null");
-
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
         return new RuleOperator(value.Trim());
     }
 }

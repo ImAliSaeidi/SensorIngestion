@@ -10,7 +10,7 @@ public sealed class SensorReadingTests
     {
         var timestamp = new DateTimeOffset(2025, 6, 1, 12, 3, 4, TimeSpan.FromHours(3.5));
 
-        var reading = new SensorReading("  PUMP-01  ", Metric.Temperature, timestamp, 67.21, 1199);
+        var reading = new SensorReading("  pump-01  ", Metric.Temperature, timestamp, 67.21, 1199);
 
         Assert.Equal("PUMP-01", reading.DeviceId);
         Assert.Equal(Metric.Temperature, reading.Metric);
@@ -36,12 +36,17 @@ public sealed class SensorReadingTests
     }
 
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Constructor_WhenDeviceIdIsBlank_ShouldThrowArgumentNullException(string? deviceId)
+    public void Constructor_WhenDeviceIdIsBlank_ShouldThrowArgumentException(string? deviceId)
     {
-        Assert.Throws<ArgumentNullException>(() => new SensorReading(deviceId!, Metric.Temperature, DateTimeOffset.UtcNow, 1, 1));
+        Assert.Throws<ArgumentException>(() => new SensorReading(deviceId!, Metric.Temperature, DateTimeOffset.UtcNow, 1, 1));
+    }
+
+    [Fact]
+    public void Constructor_WhenDeviceIdIsNull_ShouldThrowArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => new SensorReading(null!, Metric.Temperature, DateTimeOffset.UtcNow, 1, 1));
     }
 
     [Fact]

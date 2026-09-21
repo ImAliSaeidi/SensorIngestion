@@ -11,8 +11,8 @@ I reviewed the AI-assisted documentation and tests and implemented the correspon
 ## Prerequisites
 
 - .NET 10 SDK
-- The supplied `readings.jsonl` file
-- A JSON rule file such as [`data/rules.json`](data/rules.json)
+- The supplied [`readings.jsonl`](src/SensorIngestion.Api/data/readings.jsonl) file
+- The default JSON rule file [`rules.json`](src/SensorIngestion.Api/data/rules.json)
 
 SQLite is embedded through EF Core, so no external database server is required.
 
@@ -25,7 +25,7 @@ dotnet build .\SensorIngestion.slnx --configuration Release
 dotnet test .\SensorIngestion.slnx --configuration Release
 ```
 
-The Development configuration expects the supplied input at `D:\DanaTadbir\readings.jsonl`, processes it during startup, and copies `data/rules.json` beside the application output:
+The Development configuration uses the supplied input and rules from `src/SensorIngestion.Api/data`. Both files are copied beside the application output during build. It processes the input during startup:
 
 ```powershell
 dotnet run --project .\src\SensorIngestion.Api\SensorIngestion.Api.csproj
@@ -82,9 +82,13 @@ The dependency direction is `Api -> Infrastructure/Application -> Domain`:
 
 - `SensorIngestion.Domain` contains readings, rules, rule evaluations, alert models, identities, and invariants. It has no ASP.NET Core, EF Core, file, or JSON dependency.
 - `SensorIngestion.Application` contains ingestion orchestration, preprocessing, rule strategies, stateful evaluation, cooldown, aggregation, and persistence/input ports.
-- `SensorIngestion.Infrastructure` implements JSONL input, JSON rule loading, SQLite persistence, and aggregate queries.
+- `SensorIngestion.Infrastructure` implements JSONL input, JSON rule loading, SQLite persistence, and aggregate queries. Entity Framework-specific adapters, the `DbContext`, and EF mappings live under `Persistence/EF`; their class names stay technology-neutral.
 - `SensorIngestion.Api` is the composition root and exposes the HTTP endpoint.
 - The two test projects separate fast domain/application tests from file, SQLite, startup, and HTTP integration tests.
+
+### Code style
+
+Argument guards use the standard .NET `ArgumentException.ThrowIf...` and `ArgumentNullException.ThrowIfNull` helpers wherever the failure is an invalid method argument. Explicit exceptions remain only where the code reports a domain invariant, a configuration/startup failure, or a structured data-validation error; those cases are not interchangeable with ordinary argument guards.
 
 SQLite was selected because the supplied input is a bounded assessment dataset and the task explicitly permits it. Storage access is behind application interfaces, so PostgreSQL or a time-series store can replace SQLite without moving persistence concerns into the domain. A time-series database would become attractive for high-volume retention and analytical queries, while alerts, rule versions, and audit records could remain in relational storage.
 
@@ -114,12 +118,16 @@ An enabled rule applies when its metric matches and its optional `deviceId` is e
 
 An operator describes the condition a reading must satisfy. For example, `GreaterThan` passes only when the reading value is greater than its threshold; otherwise the rule is violated. Every applicable rule produces an auditable evaluation. A reading is acceptable only when all applicable rules pass, and one failed rule is enough to classify it as unacceptable.
 
-The stateless evaluation loop resolves operator strategies through `RuleOperatorRegistry`; it does not contain an operator switch. To add another stateless operator:
+`RuleEngine` coordinates evaluation and classifies each reading once after every applicable decision has been collected. Stateless strategies are resolved through `RuleOperatorRegistry`, while stateful evaluators are resolved through `StatefulRuleEvaluatorRegistry`. Dispatch is based on the evaluator registered for an operator, not on parameter names such as `durationSeconds`.
+
+To add another stateless operator:
 
 1. Add its name and parameter names.
 2. Implement `IRuleOperatorStrategy`.
 3. Register the strategy in dependency injection.
-4. Extend the JSON adapter's validation and parameter mapping for the new input shape.
+4. Extend `RuleDefinitionFactory` for the new JSON input shape.
+
+To add another stateful operator, implement `IStatefulRuleEvaluator` and register it. The ingestion processor and the existing evaluation paths do not change.
 
 The existing evaluation loop does not change. Adding or changing rule instances for supported operators only requires replacing `rules.json` and restarting the service. Missing files, malformed JSON, duplicate IDs, unknown operators, or missing/invalid parameters fail startup instead of silently disabling checks.
 
@@ -201,15 +209,9 @@ sqlite3 .\sqlite-data\sensor-ingestion.db
 
 Copying the complete directory also preserves SQLite sidecar files if they exist.
 
-## File ingestion API
+## Ingestion entry point
 
-`POST /api/ingestions` starts a complete ingestion run for an uploaded file. The request uses `multipart/form-data` with a field named `file`. The filename may end in `.json` or `.jsonl`, but its content must be JSON Lines: one reading object per line. The maximum request size is 100 MB.
-
-```powershell
-curl.exe -X POST "http://localhost:8080/api/ingestions" -F "file=@D:\path\to\readings.jsonl"
-```
-
-The call completes after parsing, deduplication, evaluation, alert generation, and persistence. Its JSON response contains the processing report, rejected-line details, and generated alerts. The temporary upload is deleted after the request. Uploading the same file again records another audited run but does not duplicate persisted readings, evaluations, or alerts.
+Ingestion is started from the configured JSONL file. Set `Input:ProcessOnStartup` to `true` to run it during application startup, or invoke the application service from another host process. The input path can be replaced through `Input:Path`.
 
 ## Aggregation API
 
@@ -250,7 +252,7 @@ Counter meanings are:
 - `RuleViolations`: individual failed rule results, which can exceed the number of unacceptable readings.
 - `AlertsGenerated`: new alerts that pass cooldown and persistence idempotency.
 
-Verified first-run report for the supplied `readings.jsonl` and repository `rules.json`:
+Verified first-run report for the supplied `src/SensorIngestion.Api/data/readings.jsonl` and `src/SensorIngestion.Api/data/rules.json`:
 
 ```text
 Total lines read: 2150
@@ -272,10 +274,10 @@ The supplied data does not contain a confirmed `SustainedAbove` episode for the 
 
 The final Release verification completed with:
 
-- 210 passing unit tests
-- 51 passing integration tests
+- 214 passing unit tests
+- 45 passing integration tests
 - 0 failed or skipped tests
 - 0 compiler or analyzer warnings
 - 0 build errors
 
-Integration coverage includes messy out-of-order ingestion, cancellation and failure propagation, rule-file replacement, SQLite rollback and uniqueness, idempotent file uploads, Swagger generation, structured logs, acceptable-only half-open aggregation, and HTTP validation.
+Integration coverage includes messy out-of-order ingestion, cancellation and failure propagation, rule-file replacement, SQLite rollback and uniqueness, idempotent file re-processing, Swagger generation, structured logs, acceptable-only half-open aggregation, and HTTP validation for the aggregation endpoint.

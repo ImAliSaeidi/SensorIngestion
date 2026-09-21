@@ -13,12 +13,17 @@ public sealed class RuleOperatorTests
     }
 
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Create_WhenValueIsBlank_ShouldThrowArgumentNullException(string? value)
+    public void Create_WhenValueIsBlank_ShouldThrowArgumentException(string? value)
     {
-        Assert.Throws<ArgumentNullException>(() => RuleOperator.Create(value!));
+        Assert.Throws<ArgumentException>(() => RuleOperator.Create(value!));
+    }
+
+    [Fact]
+    public void Create_WhenValueIsNull_ShouldThrowArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => RuleOperator.Create(null!));
     }
 
     [Fact]

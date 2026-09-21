@@ -11,10 +11,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Abstractions\" />
+    <Folder Include="Abstractions\Rules\" />
     <Folder Include="Alerting\" />
     <Folder Include="Aggregation\" />
-    <Folder Include="Reporting\" />
   </ItemGroup>
 
   <ItemGroup>

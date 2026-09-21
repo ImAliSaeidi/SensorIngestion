@@ -13,13 +13,18 @@ public sealed class ReadingRejectionTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new ReadingRejection(lineNumber, RejectionCategory.EmptyLine, "rejected"));
     }
 
+    [Fact]
+    public void Constructor_WhenReasonIsNull_ShouldThrowArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => new ReadingRejection(1, RejectionCategory.EmptyLine, null!));
+    }
+
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Constructor_WhenReasonIsBlank_ShouldThrowArgumentException(string? reason)
+    public void Constructor_WhenReasonIsWhitespace_ShouldThrowArgumentException(string reason)
     {
-        Assert.Throws<ArgumentException>(() => new ReadingRejection(1, RejectionCategory.EmptyLine, reason!));
+        Assert.Throws<ArgumentException>(() => new ReadingRejection(1, RejectionCategory.EmptyLine, reason));
     }
 
     [Fact]

@@ -8,8 +8,7 @@ public sealed class InputLine
 
     public InputLine(long lineNumber, string content)
     {
-        if (lineNumber <= 0)
-            throw new ArgumentOutOfRangeException(nameof(lineNumber), "input line number is required");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(lineNumber);
 
         ArgumentNullException.ThrowIfNull(content);
 

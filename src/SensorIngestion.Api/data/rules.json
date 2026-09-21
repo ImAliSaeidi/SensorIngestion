@@ -1,0 +1,30 @@
+[
+  {
+    "id": "temperature-limit",
+    "name": "Temperature Limit",
+    "deviceId": "PUMP-01",
+    "metric": "temperature",
+    "operator": "GreaterThan",
+    "threshold": 80,
+    "enabled": true
+  },
+  {
+    "id": "pressure-range",
+    "name": "Pressure Range",
+    "metric": "pressure",
+    "operator": "Between",
+    "lowerBound": 2,
+    "upperBound": 5,
+    "enabled": true
+  },
+  {
+    "id": "sustained-temperature",
+    "name": "Sustained Temperature",
+    "deviceId": "PUMP-01",
+    "metric": "temperature",
+    "operator": "SustainedAbove",
+    "threshold": 80,
+    "durationSeconds": 30,
+    "enabled": true
+  }
+]

@@ -14,8 +14,7 @@ public sealed record RuleParameter
 
     public static RuleParameter Create(string name, double value)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentNullException(nameof(name), "rule parameter name cannot be null;");
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         if (!double.IsFinite(value))
             throw new ArgumentException("rule parameter value must be finite", nameof(value));

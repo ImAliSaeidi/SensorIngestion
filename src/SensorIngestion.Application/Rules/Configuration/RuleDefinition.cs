@@ -34,7 +34,7 @@ public sealed class RuleDefinition
         Name = name.Trim();
         Enabled = enabled;
         Metric = metric;
-        DeviceId = string.IsNullOrWhiteSpace(deviceId) ? null : deviceId.Trim();
+        DeviceId = string.IsNullOrWhiteSpace(deviceId) ? null : deviceId.Trim().ToUpperInvariant();
         Operator = @operator;
         Parameters = parameters.ToList().AsReadOnly();
         ConfigurationHash = configurationHash;

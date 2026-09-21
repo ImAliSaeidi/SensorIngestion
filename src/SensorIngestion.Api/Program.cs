@@ -1,10 +1,13 @@
+using SensorIngestion.Application.Abstractions.Persistence;
+using SensorIngestion.Application.Abstractions.Rules.Configuration;
+using SensorIngestion.Application.Abstractions.Rules.Evaluation;
+using SensorIngestion.Application.Abstractions.Rules.Evaluation.Stateful;
 using SensorIngestion.Application.Alerting;
-using SensorIngestion.Application.Rules.Configuration;
 using SensorIngestion.Application.Rules.Evaluation;
 using SensorIngestion.Application.Rules.Evaluation.Operators;
 using SensorIngestion.Application.Rules.Evaluation.Stateful;
 using SensorIngestion.Infrastructure;
-using SensorIngestion.Infrastructure.Persistence;
+using SensorIngestion.Infrastructure.Persistence.EF;
 using SensorIngestion.Infrastructure.RuleConfiguration;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,9 +40,11 @@ builder.Services.AddSingleton<IRuleOperatorStrategy, GreaterThanOperatorStrategy
 builder.Services.AddSingleton<IRuleOperatorStrategy, GreaterThanOrEqualOperatorStrategy>();
 builder.Services.AddSingleton<IRuleOperatorStrategy, LessThanOperatorStrategy>();
 builder.Services.AddSingleton<IRuleOperatorStrategy, LessThanOrEqualOperatorStrategy>();
+builder.Services.AddSingleton<IStatefulRuleEvaluator, SustainedAboveEvaluator>();
 builder.Services.AddSingleton<RuleOperatorRegistry>();
+builder.Services.AddSingleton<StatefulRuleEvaluatorRegistry>();
 builder.Services.AddSingleton<StatelessRuleEvaluator>();
-builder.Services.AddSingleton<SustainedAboveEvaluator>();
+builder.Services.AddSingleton<RuleEngine>();
 builder.Services.AddSingleton<AlertGenerator>();
 
 var app = builder.Build();
@@ -51,7 +56,7 @@ await using (var scope = app.Services.CreateAsyncScope())
 
     var ruleLoader = scope.ServiceProvider.GetRequiredService<IRuleConfigurationLoader>();
     var ruleDefinitions = await ruleLoader.LoadAsync(CancellationToken.None);
-    var ruleCatalog = scope.ServiceProvider.GetRequiredService<SensorIngestion.Application.Persistence.IRuleCatalog>();
+    var ruleCatalog = scope.ServiceProvider.GetRequiredService<IRuleCatalog>();
     await ruleCatalog.SynchronizeAsync(ruleDefinitions, DateTimeOffset.UtcNow, CancellationToken.None);
 
     if (builder.Configuration.GetValue<bool>("Input:ProcessOnStartup"))

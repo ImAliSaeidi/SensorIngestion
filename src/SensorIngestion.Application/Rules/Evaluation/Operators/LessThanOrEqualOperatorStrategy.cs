@@ -1,4 +1,5 @@
-﻿using SensorIngestion.Domain.Rules;
+using SensorIngestion.Application.Abstractions.Rules.Evaluation;
+using SensorIngestion.Domain.Rules;
 
 namespace SensorIngestion.Application.Rules.Evaluation.Operators;
 

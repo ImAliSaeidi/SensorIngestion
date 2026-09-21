@@ -44,12 +44,17 @@ public sealed class RuleEvaluationTests
         Assert.Throws<ArgumentOutOfRangeException>(() => RuleEvaluation.Passed(1, ruleId, DateTimeOffset.UtcNow));
     }
 
+    [Fact]
+    public void Violated_WhenReasonIsNull_ShouldThrowArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => RuleEvaluation.Violated(1, 1, null!, DateTimeOffset.UtcNow));
+    }
+
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Violated_WhenReasonIsBlank_ShouldThrowArgumentException(string? reason)
+    public void Violated_WhenReasonIsWhitespace_ShouldThrowArgumentException(string reason)
     {
-        Assert.Throws<ArgumentException>(() => RuleEvaluation.Violated(1, 1, reason!, DateTimeOffset.UtcNow));
+        Assert.Throws<ArgumentException>(() => RuleEvaluation.Violated(1, 1, reason, DateTimeOffset.UtcNow));
     }
 }

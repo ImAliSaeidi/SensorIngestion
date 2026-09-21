@@ -1,3 +1,5 @@
+using SensorIngestion.Application.Abstractions.Aggregation;
+
 namespace SensorIngestion.Application.Aggregation;
 
 public sealed class GetReadingAggregates(IReadingAggregationStore store)

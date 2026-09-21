@@ -15,7 +15,7 @@ public sealed class RuleTests
         var rule = CreateRule(
             ruleKey: "  high-temperature  ",
             name: "  High temperature  ",
-            deviceId: "  PUMP-01  ",
+            deviceId: "  pump-01  ",
             parameters: [parameter],
             configurationHash: "  abc123  ",
             createdAt: createdAt);
@@ -34,12 +34,17 @@ public sealed class RuleTests
     }
 
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Constructor_WhenRuleKeyIsBlank_ShouldThrowArgumentNullException(string? ruleKey)
+    public void Constructor_WhenRuleKeyIsBlank_ShouldThrowArgumentException(string? ruleKey)
     {
-        Assert.Throws<ArgumentNullException>(() => CreateRule(ruleKey: ruleKey!));
+        Assert.Throws<ArgumentException>(() => CreateRule(ruleKey: ruleKey!));
+    }
+
+    [Fact]
+    public void Constructor_WhenRuleKeyIsNull_ShouldThrowArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => CreateRule(ruleKey: null!));
     }
 
     [Theory]
@@ -51,21 +56,31 @@ public sealed class RuleTests
     }
 
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Constructor_WhenNameIsBlank_ShouldThrowArgumentNullException(string? name)
+    public void Constructor_WhenNameIsBlank_ShouldThrowArgumentException(string? name)
     {
-        Assert.Throws<ArgumentNullException>(() => CreateRule(name: name!));
+        Assert.Throws<ArgumentException>(() => CreateRule(name: name!));
+    }
+
+    [Fact]
+    public void Constructor_WhenNameIsNull_ShouldThrowArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => CreateRule(name: null!));
     }
 
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Constructor_WhenConfigurationHashIsBlank_ShouldThrowArgumentNullException(string? hash)
+    public void Constructor_WhenConfigurationHashIsBlank_ShouldThrowArgumentException(string? hash)
     {
-        Assert.Throws<ArgumentNullException>(() => CreateRule(configurationHash: hash!));
+        Assert.Throws<ArgumentException>(() => CreateRule(configurationHash: hash!));
+    }
+
+    [Fact]
+    public void Constructor_WhenConfigurationHashIsNull_ShouldThrowArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => CreateRule(configurationHash: null!));
     }
 
     [Fact]

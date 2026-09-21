@@ -1,3 +1,4 @@
+using SensorIngestion.Application.Abstractions.Aggregation;
 using SensorIngestion.Application.Aggregation;
 using SensorIngestion.Domain.Metrics;
 

@@ -1,39 +1,61 @@
 using Microsoft.Extensions.Logging;
+using SensorIngestion.Application.Abstractions.Ingestion;
+using SensorIngestion.Application.Abstractions.Persistence;
+using SensorIngestion.Application.Abstractions.Rules.Configuration;
 using SensorIngestion.Application.Alerting;
 using SensorIngestion.Application.Ingestion.Preprocessing;
 using SensorIngestion.Application.Persistence;
-using SensorIngestion.Application.Rules;
-using SensorIngestion.Application.Rules.Configuration;
 using SensorIngestion.Application.Rules.Evaluation;
-using SensorIngestion.Application.Rules.Evaluation.Stateful;
+using SensorIngestion.Domain.Alerts;
 using SensorIngestion.Domain.Readings;
 using SensorIngestion.Domain.Rules;
 
 namespace SensorIngestion.Application.Ingestion;
 
 public sealed class IngestionProcessor(
-    IReadingSource defaultSource,
-    IReadingParser parser,
+    IReadingSource readingSource,
+    IReadingParser readingParser,
     IRuleConfigurationLoader ruleLoader,
     IRuleCatalog ruleCatalog,
-    StatelessRuleEvaluator statelessEvaluator,
-    SustainedAboveEvaluator sustainedAboveEvaluator,
+    RuleEngine ruleEngine,
     AlertGenerator alertGenerator,
     IIngestionPersistence persistence,
     TimeProvider timeProvider,
     ILogger<IngestionProcessor> logger)
 {
     public async Task<IngestionResult> ProcessAsync(CancellationToken cancellationToken)
-        => await ProcessAsync(defaultSource, cancellationToken);
-
-    public async Task<IngestionResult> ProcessAsync(IReadingSource source, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(readingSource);
 
         var startedAt = timeProvider.GetUtcNow();
-        var fingerprint = await source.GetFingerprintAsync(cancellationToken);
+        var fingerprint = await readingSource.GetFingerprintAsync(cancellationToken);
+        var rules = await LoadRulesAsync(startedAt, cancellationToken);
+        var input = await ReadInputAsync(readingSource, cancellationToken);
+        var deduplication = ReadingDeduplicator.Deduplicate(input.Readings);
+        LogConflictingDuplicates(deduplication.Duplicates);
+
+        var uniqueReadings = deduplication.UniqueReadings.ToArray();
+        var evaluation = ruleEngine.Evaluate(uniqueReadings, rules);
+        var evaluations = CreateEvaluationDrafts(evaluation);
+        var alerts = GenerateAlerts(evaluation);
+
+        var completedAt = timeProvider.GetUtcNow();
+        var report = CreateReport(input, deduplication, evaluations, rules.Count, alerts.Alerts.Count);
+        var request = new IngestionPersistenceRequest(fingerprint, startedAt, completedAt, uniqueReadings, evaluations.Drafts, alerts.Alerts, report);
+        var persistenceResult = await persistence.PersistAsync(request, cancellationToken);
+        LogCompleted(fingerprint, persistenceResult.Report);
+        return new IngestionResult(persistenceResult.Report, input.Rejections, persistenceResult.PersistedAlerts);
+    }
+
+    #region Private Methods
+    private async Task<IReadOnlyList<Rule>> LoadRulesAsync(DateTimeOffset loadedAt, CancellationToken cancellationToken)
+    {
         var definitions = await ruleLoader.LoadAsync(cancellationToken);
-        var rules = await ruleCatalog.SynchronizeAsync(definitions, startedAt, cancellationToken);
+        return await ruleCatalog.SynchronizeAsync(definitions, loadedAt, cancellationToken);
+    }
+
+    private async Task<InputBatch> ReadInputAsync(IReadingSource source, CancellationToken cancellationToken)
+    {
         var readings = new List<SensorReading>();
         var rejections = new List<ReadingRejection>();
         var totalLines = 0;
@@ -42,7 +64,7 @@ public sealed class IngestionProcessor(
         await foreach (var line in source.ReadAsync(cancellationToken))
         {
             totalLines++;
-            var parseResult = parser.Parse(line);
+            var parseResult = readingParser.Parse(line);
 
             if (parseResult.WasParsed)
                 parsedReadings++;
@@ -55,73 +77,65 @@ public sealed class IngestionProcessor(
 
             var rejection = parseResult.Rejection!;
             rejections.Add(rejection);
-            logger.LogWarning(IngestionLogEvents.RejectedRecord, "Reading rejected at line {LineNumber} with category {Category}: {Reason}", rejection.LineNumber, rejection.Category, rejection.Reason);
+            LogRejection(rejection);
         }
 
-        var deduplication = ReadingDeduplicator.Deduplicate(readings);
-        LogConflictingDuplicates(deduplication.Duplicates);
+        return new InputBatch(readings, rejections, totalLines, parsedReadings);
+    }
 
-        var uniqueReadings = deduplication.UniqueReadings.ToArray();
-        var statelessRules = rules.Where(rule => !IsSustainedAbove(rule)).ToArray();
-        var evaluationDrafts = new List<RuleEvaluationDraft>();
-        var violationCount = 0;
+    private static EvaluationDraftBatch CreateEvaluationDrafts(RuleEngineResult evaluation)
+    {
+        var drafts = evaluation.Decisions
+            .Select(x => new RuleEvaluationDraft(x.Reading, x.Decision.Rule, x.Decision.IsViolated, x.Decision.Explanation))
+            .ToArray();
 
-        foreach (var reading in uniqueReadings)
-        {
-            var evaluation = statelessEvaluator.Evaluate(reading, statelessRules);
-            foreach (var decision in evaluation.Decisions)
-                AddDraft(reading, decision, rules, evaluationDrafts, ref violationCount);
-        }
+        return new EvaluationDraftBatch(drafts, evaluation.Decisions.Count(x => x.Decision.IsViolated));
+    }
 
-        var streams = ReadingStreamOrganizer.Organize(uniqueReadings);
-        var sustainedResult = sustainedAboveEvaluator.Evaluate(streams, rules);
+    private AlertGenerationResult GenerateAlerts(RuleEngineResult evaluation)
+    {
+        LogRuleViolationEpisodes(evaluation);
 
-        foreach (var readingDecision in sustainedResult.Decisions)
-            AddDraft(readingDecision.Reading, readingDecision.Decision, rules, evaluationDrafts, ref violationCount);
+        var candidates = evaluation.Episodes
+            .Select(episode => new AlertCandidate(episode.Rule.Id, episode.DeviceId, episode.Metric, episode.StartTimestamp, episode.EndTimestamp, episode.PeakValue, episode.IsOpen))
+            .ToArray();
+        var result = alertGenerator.Generate(candidates, timeProvider.GetUtcNow());
+        LogAlertEvents(result);
+        return result;
+    }
 
-        foreach (var episode in sustainedResult.Episodes)
+    private static ProcessingReport CreateReport(InputBatch input, ReadingDeduplicationResult deduplication, EvaluationDraftBatch evaluations, int rulesLoaded, int alertsGenerated)
+    {
+        return new ProcessingReport(
+            input.TotalLines,
+            input.ParsedReadings,
+            0,
+            deduplication.Duplicates.Count,
+            input.Rejections.Count,
+            rulesLoaded,
+            evaluations.Drafts.Count,
+            deduplication.UniqueReadings.Count(x => x.Classification == ReadingClassification.Acceptable),
+            deduplication.UniqueReadings.Count(x => x.Classification == ReadingClassification.Unacceptable),
+            evaluations.ViolationCount,
+            alertsGenerated);
+    }
+
+    private void LogRejection(ReadingRejection rejection)
+        => logger.LogWarning(IngestionLogEvents.RejectedRecord, "Reading rejected at line {LineNumber} with category {Category}: {Reason}", rejection.LineNumber, rejection.Category, rejection.Reason);
+
+    private void LogRuleViolationEpisodes(RuleEngineResult evaluation)
+    {
+        foreach (var episode in evaluation.Episodes)
         {
             logger.LogInformation(
-                IngestionLogEvents.SustainedEpisode,
-                "Sustained episode confirmed for rule {RuleKey}, device {DeviceId}, metric {Metric}, from {StartTimestamp} to {EndTimestamp}",
+                IngestionLogEvents.RuleViolationEpisode,
+                "Rule violation episode confirmed for rule {RuleKey}, device {DeviceId}, metric {Metric}, from {StartTimestamp} to {EndTimestamp}",
                 episode.Rule.RuleKey,
                 episode.DeviceId,
                 episode.Metric.Value,
                 episode.StartTimestamp,
                 episode.EndTimestamp);
         }
-
-        var candidates = sustainedResult.Episodes.Select(episode => AlertCandidateFactory.Create(episode, episode.Rule.Id)).ToArray();
-        var generated = alertGenerator.Generate(candidates, timeProvider.GetUtcNow());
-        LogAlertEvents(generated);
-
-        var completedAt = timeProvider.GetUtcNow();
-        var report = new ProcessingReport(
-            totalLines,
-            parsedReadings,
-            0,
-            deduplication.Duplicates.Count,
-            rejections.Count,
-            rules.Count,
-            evaluationDrafts.Count,
-            uniqueReadings.Count(x => x.Classification == ReadingClassification.Acceptable),
-            uniqueReadings.Count(x => x.Classification == ReadingClassification.Unacceptable),
-            violationCount,
-            generated.Alerts.Count);
-
-        var request = new IngestionPersistenceRequest(fingerprint, startedAt, completedAt, uniqueReadings, evaluationDrafts, generated.Alerts, report);
-        var persistenceResult = await persistence.PersistAsync(request, cancellationToken);
-
-        logger.LogInformation(
-            IngestionLogEvents.IngestionCompleted,
-            "Ingestion completed for fingerprint {FileFingerprint}: {TotalLinesRead} lines, {StoredReadings} stored readings, {InvalidRecordsRejected} invalid records, {AlertsGenerated} alerts",
-            fingerprint,
-            persistenceResult.Report.TotalLinesRead,
-            persistenceResult.Report.StoredReadings,
-            persistenceResult.Report.InvalidRecordsRejected,
-            persistenceResult.Report.AlertsGenerated);
-
-        return new IngestionResult(persistenceResult.Report, rejections, persistenceResult.PersistedAlerts);
     }
 
     private void LogConflictingDuplicates(IEnumerable<DuplicateReading> duplicates)
@@ -147,15 +161,20 @@ public sealed class IngestionProcessor(
             logger.LogInformation(IngestionLogEvents.AlertSuppressed, "Alert suppressed by cooldown for rule {RuleId}, device {DeviceId}, metric {Metric}, starting {StartTimestamp}", candidate.RuleId, candidate.DeviceId, candidate.Metric.Value, candidate.StartTimestamp);
     }
 
-    private static void AddDraft(SensorReading reading, RuleEvaluationDecision decision, IReadOnlyCollection<Rule> rules, ICollection<RuleEvaluationDraft> drafts, ref int violationCount)
+    private void LogCompleted(string fingerprint, ProcessingReport report)
     {
-        var rule = rules.Single(x => x.RuleKey == decision.RuleKey);
-        drafts.Add(new RuleEvaluationDraft(reading, rule, decision.IsViolated, decision.Explanation));
-
-        if (decision.IsViolated)
-            violationCount++;
+        logger.LogInformation(
+            IngestionLogEvents.IngestionCompleted,
+            "Ingestion completed for fingerprint {FileFingerprint}: {TotalLinesRead} lines, {StoredReadings} stored readings, {InvalidRecordsRejected} invalid records, {AlertsGenerated} alerts",
+            fingerprint,
+            report.TotalLinesRead,
+            report.StoredReadings,
+            report.InvalidRecordsRejected,
+            report.AlertsGenerated);
     }
 
-    private static bool IsSustainedAbove(Rule rule)
-        => string.Equals(rule.Operator.Value, RuleOperatorNames.SustainedAbove, StringComparison.Ordinal);
+    private sealed record InputBatch(IReadOnlyList<SensorReading> Readings, IReadOnlyList<ReadingRejection> Rejections, int TotalLines, int ParsedReadings);
+
+    private sealed record EvaluationDraftBatch(IReadOnlyList<RuleEvaluationDraft> Drafts, int ViolationCount);
+    #endregion
 }

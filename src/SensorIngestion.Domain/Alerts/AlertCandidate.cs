@@ -22,11 +22,8 @@ public sealed record AlertCandidate
 
     public AlertCandidate(long ruleId, string deviceId, Metric metric, DateTimeOffset startTimestamp, DateTimeOffset endTimestamp, double? peakValue, bool isOpen)
     {
-        if (ruleId <= 0)
-            throw new ArgumentOutOfRangeException(nameof(ruleId), "alert candidate rule id is required");
-
-        if (string.IsNullOrWhiteSpace(deviceId))
-            throw new ArgumentNullException(nameof(deviceId), "alert candidate device id is required");
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(ruleId, 0);
+        ArgumentException.ThrowIfNullOrWhiteSpace(deviceId);
 
         if (endTimestamp < startTimestamp)
             throw new ArgumentException("end timestamp cannot be before start timestamp");
@@ -34,9 +31,11 @@ public sealed record AlertCandidate
         if (peakValue.HasValue && !double.IsFinite(peakValue.Value))
             throw new ArgumentException("peak value must be finite", nameof(peakValue));
 
+        ArgumentNullException.ThrowIfNull(metric);
+
         RuleId = ruleId;
-        DeviceId = deviceId.Trim();
-        Metric = metric ?? throw new ArgumentNullException(nameof(metric), "alert candidate metric is required");
+        DeviceId = deviceId.Trim().ToUpperInvariant();
+        Metric = metric;
         StartTimestamp = startTimestamp.ToUniversalTime();
         EndTimestamp = endTimestamp.ToUniversalTime();
         PeakValue = peakValue;

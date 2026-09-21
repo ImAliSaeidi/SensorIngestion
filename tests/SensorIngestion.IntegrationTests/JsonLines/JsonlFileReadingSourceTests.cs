@@ -1,3 +1,4 @@
+using SensorIngestion.Application.Abstractions.Ingestion;
 using SensorIngestion.Application.Ingestion;
 using SensorIngestion.Infrastructure.JsonLines;
 

@@ -1,7 +1,10 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using SensorIngestion.Application.Abstractions.Ingestion;
+using SensorIngestion.Application.Abstractions.Persistence;
+using SensorIngestion.Application.Abstractions.Rules.Configuration;
 using SensorIngestion.Application.Alerting;
 using SensorIngestion.Application.Ingestion;
 using SensorIngestion.Application.Persistence;
@@ -13,7 +16,7 @@ using SensorIngestion.Application.Rules.Evaluation.Stateful;
 using SensorIngestion.Domain.Metrics;
 using SensorIngestion.Domain.Rules;
 using SensorIngestion.Infrastructure.JsonLines;
-using SensorIngestion.Infrastructure.Persistence;
+using SensorIngestion.Infrastructure.Persistence.EF;
 using System.Runtime.CompilerServices;
 
 namespace SensorIngestion.IntegrationTests.Ingestion;
@@ -88,7 +91,7 @@ public sealed class IngestionProcessorTests
 
         Assert.Contains(logger.Entries, x => x.EventId == IngestionLogEvents.RejectedRecord.Id && x.HasProperty("LineNumber"));
         Assert.Contains(logger.Entries, x => x.EventId == IngestionLogEvents.DuplicateConflict.Id && x.HasProperty("DeviceId") && x.HasProperty("Sequence"));
-        Assert.Equal(2, logger.Entries.Count(x => x.EventId == IngestionLogEvents.SustainedEpisode.Id));
+        Assert.Equal(2, logger.Entries.Count(x => x.EventId == IngestionLogEvents.RuleViolationEpisode.Id));
         Assert.Contains(logger.Entries, x => x.EventId == IngestionLogEvents.AlertEmitted.Id && x.HasProperty("RuleId"));
         Assert.Contains(logger.Entries, x => x.EventId == IngestionLogEvents.AlertSuppressed.Id && x.HasProperty("StartTimestamp"));
         Assert.Contains(logger.Entries, x => x.EventId == IngestionLogEvents.IngestionCompleted.Id && x.HasProperty("FileFingerprint") && x.HasProperty("StoredReadings"));
@@ -97,15 +100,16 @@ public sealed class IngestionProcessorTests
     private static IngestionProcessor CreateProcessor(SensorIngestionDbContext context, IReadingSource source, IRuleConfigurationLoader ruleLoader, IIngestionPersistence? persistence = null, ILogger<IngestionProcessor>? logger = null)
     {
         var registry = new RuleOperatorRegistry([new GreaterThanOperatorStrategy()]);
+        var statefulRegistry = new StatefulRuleEvaluatorRegistry([new SustainedAboveEvaluator()]);
+        var ruleEngine = new RuleEngine(new StatelessRuleEvaluator(registry), statefulRegistry);
         return new IngestionProcessor(
             source,
             new JsonlReadingParser(),
             ruleLoader,
-            new EfRuleCatalog(context),
-            new StatelessRuleEvaluator(registry),
-            new SustainedAboveEvaluator(),
+            new RuleCatalog(context),
+            ruleEngine,
             new AlertGenerator(),
-            persistence ?? new EfIngestionPersistence(context),
+            persistence ?? new IngestionPersistence(context),
             new FixedTimeProvider(Start.AddHours(2)),
             logger ?? NullLogger<IngestionProcessor>.Instance);
     }

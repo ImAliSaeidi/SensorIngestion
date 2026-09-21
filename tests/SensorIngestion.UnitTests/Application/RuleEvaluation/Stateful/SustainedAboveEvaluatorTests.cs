@@ -20,7 +20,7 @@ public sealed class SustainedAboveEvaluatorTests
 
         Assert.Empty(result.Episodes);
         Assert.All(result.Decisions, decision => Assert.False(decision.Decision.IsViolated));
-        Assert.All(readings, reading => Assert.Equal(ReadingClassification.Acceptable, reading.Classification));
+        Assert.All(readings, reading => Assert.Equal(ReadingClassification.Pending, reading.Classification));
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public sealed class SustainedAboveEvaluatorTests
 
         Assert.Empty(result.Episodes);
         Assert.All(result.Decisions, decision => Assert.False(decision.Decision.IsViolated));
-        Assert.All(readings, reading => Assert.Equal(ReadingClassification.Acceptable, reading.Classification));
+        Assert.All(readings, reading => Assert.Equal(ReadingClassification.Pending, reading.Classification));
     }
 
     [Fact]
@@ -49,26 +49,21 @@ public sealed class SustainedAboveEvaluatorTests
         Assert.Equal(Start.AddSeconds(40), episode.EndTimestamp);
         Assert.Equal(85, episode.PeakValue);
         Assert.False(episode.IsOpen);
-        Assert.Equal(ReadingClassification.Acceptable, readings[0].Classification);
-        Assert.Equal(ReadingClassification.Unacceptable, readings[1].Classification);
-        Assert.Equal(ReadingClassification.Acceptable, readings[2].Classification);
+        Assert.All(readings, reading => Assert.Equal(ReadingClassification.Pending, reading.Classification));
         var violation = Assert.Single(result.Decisions, x => x.Decision.IsViolated);
         Assert.Same(readings[1], violation.Reading);
         Assert.False(string.IsNullOrWhiteSpace(violation.Decision.Explanation));
     }
 
     [Fact]
-    public void Evaluate_AfterConfirmation_ShouldClassifyAboveThresholdReadingsUntilEpisodeCloses()
+    public void Evaluate_AfterConfirmation_ShouldViolateAboveThresholdReadingsUntilEpisodeCloses()
     {
         var readings = new[] { CreateReading(0, 81), CreateReading(31, 82), CreateReading(40, 90), CreateReading(50, 80) };
 
         var result = Evaluate(readings, [CreateRule(threshold: 80, durationSeconds: 30)]);
 
-        Assert.Equal(ReadingClassification.Acceptable, readings[0].Classification);
-        Assert.Equal(ReadingClassification.Unacceptable, readings[1].Classification);
-        Assert.Equal(ReadingClassification.Unacceptable, readings[2].Classification);
-        Assert.Equal(ReadingClassification.Acceptable, readings[3].Classification);
         Assert.Equal(2, result.Decisions.Count(x => x.Decision.IsViolated));
+        Assert.All(readings, reading => Assert.Equal(ReadingClassification.Pending, reading.Classification));
     }
 
     [Fact]
@@ -93,7 +88,7 @@ public sealed class SustainedAboveEvaluatorTests
         var result = Evaluate(readings, [CreateRule(threshold: 80, durationSeconds: 30)]);
 
         Assert.Empty(result.Episodes);
-        Assert.All(readings, reading => Assert.Equal(ReadingClassification.Acceptable, reading.Classification));
+        Assert.All(readings, reading => Assert.Equal(ReadingClassification.Pending, reading.Classification));
     }
 
     [Fact]
@@ -112,8 +107,8 @@ public sealed class SustainedAboveEvaluatorTests
         Assert.Equal(sortedEpisode.EndTimestamp, shuffledEpisode.EndTimestamp);
         Assert.Equal(sortedEpisode.PeakValue, shuffledEpisode.PeakValue);
         Assert.Equal(
-            sortedReadings.OrderBy(x => x.Timestamp).Select(x => x.Classification),
-            shuffledReadings.OrderBy(x => x.Timestamp).Select(x => x.Classification));
+            sortedResult.Decisions.OrderBy(x => x.Reading.Timestamp).Select(x => x.Decision.IsViolated),
+            shuffledResult.Decisions.OrderBy(x => x.Reading.Timestamp).Select(x => x.Decision.IsViolated));
     }
 
     [Fact]
@@ -137,26 +132,25 @@ public sealed class SustainedAboveEvaluatorTests
     }
 
     [Fact]
-    public void Evaluate_WhenReadingAlreadyHasStatelessViolation_ShouldNotOverwriteItWithPassingStatefulDecision()
+    public void Evaluate_ShouldNotChangeExistingReadingClassification()
     {
         var readings = new[] { CreateReading(0, 81), CreateReading(30, 85) };
         readings[0].Classify(hasViolation: true);
         readings[1].Classify(hasViolation: false);
         var streams = ReadingStreamOrganizer.Organize(readings);
 
-        new SustainedAboveEvaluator().Evaluate(streams, [CreateRule(threshold: 80, durationSeconds: 30)]);
+        new SustainedAboveEvaluator().Evaluate(streams, CreateRule(threshold: 80, durationSeconds: 30));
 
         Assert.Equal(ReadingClassification.Unacceptable, readings[0].Classification);
-        Assert.Equal(ReadingClassification.Unacceptable, readings[1].Classification);
+        Assert.Equal(ReadingClassification.Acceptable, readings[1].Classification);
     }
 
-    private static SustainedAboveEvaluationResult Evaluate(IReadOnlyCollection<SensorReading> readings, IReadOnlyCollection<Rule> rules)
+    private static StatefulRuleEvaluationResult Evaluate(IReadOnlyCollection<SensorReading> readings, IReadOnlyCollection<Rule> rules)
     {
-        foreach (var reading in readings.Where(x => x.Classification == ReadingClassification.Pending))
-            reading.Classify(hasViolation: false);
-
         var streams = ReadingStreamOrganizer.Organize(readings);
-        return new SustainedAboveEvaluator().Evaluate(streams, rules);
+        var evaluator = new SustainedAboveEvaluator();
+        var results = rules.Select(rule => evaluator.Evaluate(streams, rule)).ToArray();
+        return new StatefulRuleEvaluationResult(results.SelectMany(x => x.Decisions).ToArray(), results.SelectMany(x => x.Episodes).ToArray());
     }
 
     private static SensorReading CreateReading(int seconds, double value, string deviceId = "PUMP-01", Metric? metric = null)
