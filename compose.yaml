@@ -1,0 +1,40 @@
+services:
+  api:
+    build:
+      context: .
+      target: final
+      args:
+        DOTNET_SDK_IMAGE: ${DOTNET_SDK_IMAGE:-mcr.hamdocker.ir/dotnet/sdk:10.0.400}
+        DOTNET_RUNTIME_IMAGE: ${DOTNET_RUNTIME_IMAGE:-mcr.hamdocker.ir/dotnet/aspnet:10.0.12}
+        NUGET_PACKAGES_SOURCE: ${NUGET_PACKAGES_SOURCE:-https://repo.hmirror.ir/nuget}
+    ports:
+      - "${SENSOR_INGESTION_PORT:-8080}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: 8080
+      Input__Path: /app/storage/readings.jsonl
+      Input__ProcessOnStartup: "false"
+      Persistence__DatabasePath: /app/storage/sensor-ingestion.db
+      RuleConfiguration__Path: /app/data/rules.json
+    volumes:
+      - sensor-ingestion-data:/app/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  tests:
+    profiles: ["test"]
+    build:
+      context: .
+      target: test
+      args:
+        DOTNET_SDK_IMAGE: ${DOTNET_SDK_IMAGE:-mcr.hamdocker.ir/dotnet/sdk:10.0.400}
+        DOTNET_RUNTIME_IMAGE: ${DOTNET_RUNTIME_IMAGE:-mcr.hamdocker.ir/dotnet/aspnet:10.0.12}
+        NUGET_PACKAGES_SOURCE: ${NUGET_PACKAGES_SOURCE:-https://repo.hmirror.ir/nuget}
+
+volumes:
+  sensor-ingestion-data:

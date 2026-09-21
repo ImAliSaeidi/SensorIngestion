@@ -43,6 +43,39 @@ dotnet run --project .\src\SensorIngestion.Api\SensorIngestion.Api.csproj -- `
 
 With the default settings, the database is created at `src/SensorIngestion.Api/bin/<Configuration>/net10.0/data/sensor-ingestion.db`. The schema is created with `EnsureCreated` because this is a self-contained assessment project; a production service would use reviewed EF Core migrations.
 
+After the application starts, Swagger UI is available at:
+
+```text
+http://localhost:5297/swagger
+```
+
+### Run and test with Docker
+
+Docker is the only prerequisite for the containerized workflow. The build uses pinned .NET 10 images and the configured NuGet mirror.
+
+Build and start the API:
+
+```powershell
+docker compose up --build -d api
+docker compose ps
+```
+
+Swagger UI is then available at `http://localhost:8080/swagger`. The SQLite database is retained in the named `sensor-ingestion-data` volume when the API container is recreated.
+
+Run the complete test suite inside an SDK container:
+
+```powershell
+docker compose --profile test run --rm tests
+```
+
+Stop the application without deleting its data:
+
+```powershell
+docker compose down
+```
+
+`docker compose down -v` also deletes the SQLite volume and should only be used when a clean database is intentionally required.
+
 ## Architecture
 
 The dependency direction is `Api -> Infrastructure/Application -> Domain`:
@@ -125,6 +158,59 @@ Record-level idempotency is enforced with unique constraints:
 
 The fingerprint is retained for audit and repeat detection, while the natural keys remain the final protection. Reprocessing the supplied file creates a new run record but inserts no duplicate readings, evaluations, or alerts.
 
+## Inspecting the SQLite database
+
+The database has no username or password. A desktop client such as DB Browser for SQLite, DBeaver, or JetBrains Rider can open the `.db` file directly. The equivalent connection string is:
+
+```text
+Data Source=<absolute-path-to-sensor-ingestion.db>
+```
+
+For a local Debug run, the default file is:
+
+```text
+src/SensorIngestion.Api/bin/Debug/net10.0/data/sensor-ingestion.db
+```
+
+With the SQLite CLI installed:
+
+```powershell
+sqlite3 .\src\SensorIngestion.Api\bin\Debug\net10.0\data\sensor-ingestion.db
+```
+
+Useful commands and queries:
+
+```sql
+.tables
+.schema Readings
+SELECT COUNT(*) FROM Readings;
+SELECT Id, DeviceId, Metric, Timestamp, Value, Classification FROM Readings LIMIT 20;
+SELECT Id, FileFingerprint, Status, TotalLinesRead, StoredReadings FROM IngestionRuns ORDER BY Id DESC;
+SELECT Id, SensorReadingId, RuleId, Outcome, Reason FROM RuleEvaluations WHERE Outcome = 'Violated' LIMIT 20;
+SELECT * FROM Alerts ORDER BY StartTimestamp DESC LIMIT 20;
+```
+
+The Docker deployment keeps the database in a named volume. To inspect a consistent offline copy, stop the API, copy the storage directory, and restart it:
+
+```powershell
+docker compose stop api
+docker compose cp api:/app/storage/. .\sqlite-data
+docker compose start api
+sqlite3 .\sqlite-data\sensor-ingestion.db
+```
+
+Copying the complete directory also preserves SQLite sidecar files if they exist.
+
+## File ingestion API
+
+`POST /api/ingestions` starts a complete ingestion run for an uploaded file. The request uses `multipart/form-data` with a field named `file`. The filename may end in `.json` or `.jsonl`, but its content must be JSON Lines: one reading object per line. The maximum request size is 100 MB.
+
+```powershell
+curl.exe -X POST "http://localhost:8080/api/ingestions" -F "file=@D:\path\to\readings.jsonl"
+```
+
+The call completes after parsing, deduplication, evaluation, alert generation, and persistence. Its JSON response contains the processing report, rejected-line details, and generated alerts. The temporary upload is deleted after the request. Uploading the same file again records another audited run but does not duplicate persisted readings, evaluations, or alerts.
+
 ## Aggregation API
 
 The endpoint is:
@@ -187,9 +273,9 @@ The supplied data does not contain a confirmed `SustainedAbove` episode for the 
 The final Release verification completed with:
 
 - 210 passing unit tests
-- 45 passing integration tests
+- 51 passing integration tests
 - 0 failed or skipped tests
 - 0 compiler or analyzer warnings
 - 0 build errors
 
-Integration coverage includes messy out-of-order ingestion, cancellation and failure propagation, rule-file replacement, SQLite rollback and uniqueness, idempotent reruns, structured logs, acceptable-only half-open aggregation, and HTTP validation.
+Integration coverage includes messy out-of-order ingestion, cancellation and failure propagation, rule-file replacement, SQLite rollback and uniqueness, idempotent file uploads, Swagger generation, structured logs, acceptable-only half-open aggregation, and HTTP validation.

@@ -1,0 +1,13 @@
+.git
+.vs
+.idea
+.vscode
+**/bin
+**/obj
+**/TestResults
+**/*.db
+**/*.db-shm
+**/*.db-wal
+*.user
+*.suo
+sensor-ingestion-task-checklist.html
