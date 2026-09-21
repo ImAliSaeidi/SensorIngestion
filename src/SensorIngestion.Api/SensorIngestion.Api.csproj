@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,8 +22,8 @@
     <ProjectReference Include="..\SensorIngestion.Infrastructure\SensorIngestion.Infrastructure.csproj" />
   </ItemGroup>
 
-<ItemGroup>
-  <Content Include="..\..\data\rules.json" Link="data\rules.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-</ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\data\rules.json" Link="data\rules.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 
 </Project>
