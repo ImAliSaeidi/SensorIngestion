@@ -45,6 +45,8 @@ public sealed class SustainedAboveEvaluator : IStatefulRuleEvaluator
 
         foreach (var reading in stream.Readings)
         {
+            // The threshold is strict. The first reading at or below it closes
+            // the episode and is never part of the violation window.
             if (reading.Value > threshold)
             {
                 if (episodeStart is null)
@@ -84,6 +86,8 @@ public sealed class SustainedAboveEvaluator : IStatefulRuleEvaluator
             isConfirmed = false;
         }
 
+        // Reaching the end of the input closes observation, but not the real-world
+        // condition, so an active confirmed episode is persisted as open.
         if (episodeStart is not null && isConfirmed)
         {
             episodes.Add(new RuleViolationEpisode(

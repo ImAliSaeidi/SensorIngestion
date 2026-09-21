@@ -18,6 +18,8 @@ public sealed class AlertGenerator
         var suppressed = new List<AlertCandidate>();
         var lastEmittedEndByStream = new Dictionary<AlertStreamKey, DateTimeOffset>();
 
+        // Cooldown is measured from the end of the last emitted episode. Suppressed
+        // candidates do not move that reference point.
         foreach (var candidate in candidates.OrderBy(x => x.StartTimestamp).ThenBy(x => x.EndTimestamp))
         {
             ArgumentNullException.ThrowIfNull(candidate);

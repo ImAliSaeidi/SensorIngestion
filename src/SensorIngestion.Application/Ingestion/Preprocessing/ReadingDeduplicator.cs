@@ -14,6 +14,8 @@ public sealed class ReadingDeduplicator
 
         foreach (var reading in readings)
         {
+            // The first valid occurrence wins. A later duplicate is still tracked
+            // so conflicting values can be reported without changing the result.
             if (seen.TryAdd(reading.Identity, reading))
             {
                 uniqueReadings.Add(reading);

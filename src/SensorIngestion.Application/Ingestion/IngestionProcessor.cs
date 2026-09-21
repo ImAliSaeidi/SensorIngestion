@@ -29,6 +29,9 @@ public sealed class IngestionProcessor(
 
         var startedAt = timeProvider.GetUtcNow();
         var fingerprint = await readingSource.GetFingerprintAsync(cancellationToken);
+
+        // Read and validate the complete batch before evaluating it. This lets the
+        // rule engine use event time even when the JSONL file is out of order.
         var rules = await LoadRulesAsync(startedAt, cancellationToken);
         var input = await ReadInputAsync(readingSource, cancellationToken);
         var deduplication = ReadingDeduplicator.Deduplicate(input.Readings);
@@ -42,6 +45,7 @@ public sealed class IngestionProcessor(
         var completedAt = timeProvider.GetUtcNow();
         var report = CreateReport(input, deduplication, evaluations, rules.Count, alerts.Alerts.Count);
         var request = new IngestionPersistenceRequest(fingerprint, startedAt, completedAt, uniqueReadings, evaluations.Drafts, alerts.Alerts, report);
+        // Persistence owns the transaction and applies database-level idempotency.
         var persistenceResult = await persistence.PersistAsync(request, cancellationToken);
         LogCompleted(fingerprint, persistenceResult.Report);
         return new IngestionResult(persistenceResult.Report, input.Rejections, persistenceResult.PersistedAlerts);

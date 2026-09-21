@@ -25,6 +25,8 @@ public sealed class GetReadingAggregates(IReadingAggregationStore store)
         var bucketDuration = TimeSpan.FromSeconds(query.BucketSeconds);
         var readings = await store.QueryAcceptableAsync(query.DeviceId.Trim(), query.Metric, query.From, query.To, cancellationToken);
 
+        // The store already applies the half-open [from, to) range. Bucket indexes
+        // are calculated from the requested start, so bucket boundaries are stable.
         return readings
             .GroupBy(reading => (long)((reading.Timestamp - query.From).Ticks / bucketDuration.Ticks))
             .OrderBy(group => group.Key)

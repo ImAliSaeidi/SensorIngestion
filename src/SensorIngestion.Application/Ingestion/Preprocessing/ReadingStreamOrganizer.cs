@@ -8,6 +8,7 @@ public sealed class ReadingStreamOrganizer
     {
         ArgumentNullException.ThrowIfNull(readings);
 
+        // Stateful rules work on one ordered event-time stream per device/metric.
         return readings
             .GroupBy(reading => new { reading.DeviceId, reading.Metric })
             .OrderBy(group => group.Key.DeviceId, StringComparer.Ordinal)

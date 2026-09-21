@@ -28,6 +28,8 @@ public sealed class RuleEngine(StatelessRuleEvaluator statelessEvaluator, Statef
                 statelessRules.Add(rule);
         }
 
+        // Stateless rules can be evaluated independently; stateful rules need the
+        // grouped, event-time ordered streams built below.
         foreach (var reading in readings)
         {
             ArgumentNullException.ThrowIfNull(reading);
@@ -47,6 +49,7 @@ public sealed class RuleEngine(StatelessRuleEvaluator statelessEvaluator, Statef
             }
         }
 
+        // Classification is assigned only after every applicable rule has spoken.
         var violatedReadings = decisions.Where(x => x.Decision.IsViolated).Select(x => x.Reading).ToHashSet();
 
         foreach (var reading in readings)

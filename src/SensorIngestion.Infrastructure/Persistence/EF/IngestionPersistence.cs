@@ -17,6 +17,8 @@ public sealed class IngestionPersistence(SensorIngestionDbContext dbContext) : I
         dbContext.IngestionRuns.Add(run);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        // Readings, evaluations, alerts, and the completed report must succeed or
+        // fail together; the run record itself remains available when a write fails.
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         try
