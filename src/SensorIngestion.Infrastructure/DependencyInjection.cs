@@ -24,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<IReadingAggregationStore, EfReadingAggregationStore>();
         services.AddScoped<GetReadingAggregates>();
         services.AddSingleton<IReadingParser, JsonlReadingParser>();
+        services.AddSingleton<IReadingSourceFactory, JsonlFileReadingSourceFactory>();
         services.AddSingleton<IReadingSource>(_ => new JsonlFileReadingSource(ResolveInputPath(configuration)));
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<IngestionProcessor>();

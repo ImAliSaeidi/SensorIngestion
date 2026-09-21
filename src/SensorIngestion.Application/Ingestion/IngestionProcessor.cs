@@ -12,7 +12,7 @@ using SensorIngestion.Domain.Rules;
 namespace SensorIngestion.Application.Ingestion;
 
 public sealed class IngestionProcessor(
-    IReadingSource source,
+    IReadingSource defaultSource,
     IReadingParser parser,
     IRuleConfigurationLoader ruleLoader,
     IRuleCatalog ruleCatalog,
@@ -24,7 +24,12 @@ public sealed class IngestionProcessor(
     ILogger<IngestionProcessor> logger)
 {
     public async Task<IngestionResult> ProcessAsync(CancellationToken cancellationToken)
+        => await ProcessAsync(defaultSource, cancellationToken);
+
+    public async Task<IngestionResult> ProcessAsync(IReadingSource source, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(source);
+
         var startedAt = timeProvider.GetUtcNow();
         var fingerprint = await source.GetFingerprintAsync(cancellationToken);
         var definitions = await ruleLoader.LoadAsync(cancellationToken);
@@ -116,7 +121,7 @@ public sealed class IngestionProcessor(
             persistenceResult.Report.InvalidRecordsRejected,
             persistenceResult.Report.AlertsGenerated);
 
-        return new IngestionResult(persistenceResult.Report, rejections, generated.Alerts);
+        return new IngestionResult(persistenceResult.Report, rejections, persistenceResult.PersistedAlerts);
     }
 
     private void LogConflictingDuplicates(IEnumerable<DuplicateReading> duplicates)

@@ -43,6 +43,8 @@ public sealed class IngestionProcessorTests
         Assert.Equal(2, first.Report.RuleViolations);
         Assert.Equal(1, first.Report.AlertsGenerated);
         Assert.Equal(0, second.Report.StoredReadings);
+        Assert.Equal(0, second.Report.AlertsGenerated);
+        Assert.Empty(second.Alerts);
         Assert.Equal(8, await fixture.Context.Readings.CountAsync());
         Assert.Equal(14, await fixture.Context.RuleEvaluations.CountAsync());
         Assert.Equal(1, await fixture.Context.Alerts.CountAsync());

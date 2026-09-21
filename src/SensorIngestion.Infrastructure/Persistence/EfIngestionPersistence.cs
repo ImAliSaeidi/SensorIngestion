@@ -22,14 +22,14 @@ public sealed class EfIngestionPersistence(SensorIngestionDbContext dbContext) :
         {
             var storedReadings = await PersistReadingsAsync(request.Readings, cancellationToken);
             var storedEvaluations = await PersistEvaluationsAsync(request.Evaluations, cancellationToken);
-            var storedAlerts = await PersistAlertsAsync(request.Alerts, cancellationToken);
-            var effectiveReport = request.Report with { StoredReadings = storedReadings };
+            var persistedAlerts = await PersistAlertsAsync(request.Alerts, cancellationToken);
+            var effectiveReport = request.Report with { StoredReadings = storedReadings, AlertsGenerated = persistedAlerts.Count };
 
             run.Complete(request.CompletedAt, effectiveReport);
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            return new IngestionPersistenceResult(storedReadings, storedEvaluations, storedAlerts, effectiveReport);
+            return new IngestionPersistenceResult(storedReadings, storedEvaluations, persistedAlerts, effectiveReport);
         }
         catch (Exception exception)
         {
@@ -92,7 +92,7 @@ public sealed class EfIngestionPersistence(SensorIngestionDbContext dbContext) :
         return evaluations.Count;
     }
 
-    private async Task<int> PersistAlertsAsync(IReadOnlyCollection<Alert> alerts, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<Alert>> PersistAlertsAsync(IReadOnlyCollection<Alert> alerts, CancellationToken cancellationToken)
     {
         var existing = await dbContext.Alerts.AsNoTracking().ToListAsync(cancellationToken);
         var identities = existing.Select(x => x.Identity).ToHashSet();
@@ -100,6 +100,6 @@ public sealed class EfIngestionPersistence(SensorIngestionDbContext dbContext) :
 
         dbContext.Alerts.AddRange(newAlerts);
         await dbContext.SaveChangesAsync(cancellationToken);
-        return newAlerts.Count;
+        return newAlerts.AsReadOnly();
     }
 }
